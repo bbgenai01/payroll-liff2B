@@ -42,6 +42,19 @@
   #loadingBox, #linkBox{ text-align:center; padding:40px 16px; }
   .hint{ font-size:12px; color:var(--muted); }
   #toast{ position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; display:none; z-index:99; }
+  .slip-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; cursor:pointer; }
+  .slip-row:active{ background:#f9fafb; }
+  .slip-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .slip-table td{ padding:5px 0; }
+  .slip-table td:last-child{ text-align:right; }
+  .slip-section-title{ font-weight:700; color:var(--primary-dark); margin:14px 0 4px; font-size:13px; }
+  .slip-total-row td{ font-weight:700; font-size:16px; border-top:2px solid var(--text); padding-top:8px; }
+  @media print{
+    header, nav.tabbar, #toast, .no-print{ display:none !important; }
+    body{ padding-bottom:0; background:#fff; }
+    main{ max-width:100%; padding:0; }
+    .card{ box-shadow:none; }
+  }
 </style>
 </head>
 <body>
@@ -111,11 +124,24 @@
     <div class="card">
       <h2>💰 เงินเดือนล่าสุด</h2>
       <div id="payslipBox"><p class="hint">กำลังโหลด...</p></div>
-      <p class="hint">ดูรายละเอียดเต็มได้จากแอดมิน — หน้านี้แสดงเฉพาะยอดสุทธิเท่านั้น</p>
     </div>
     <div class="card">
       <h2>🗓️ ประวัติย้อนหลัง</h2>
+      <p class="hint">แตะรายการเดือนที่ต้องการ เพื่อดูรายละเอียดเต็มและดาวน์โหลด/พิมพ์เก็บไว้ได้</p>
       <div id="payslipHistoryBox"><p class="hint">กำลังโหลด...</p></div>
+    </div>
+  </section>
+
+  <section id="view-payslip-detail" style="display:none;">
+    <div class="card no-print">
+      <button class="btn secondary" onclick="closePayslipDetail()">← กลับไปหน้าประวัติ</button>
+    </div>
+    <div class="card">
+      <div id="payslipDetailBox"><p class="hint">กำลังโหลด...</p></div>
+    </div>
+    <div class="card no-print">
+      <button class="btn" onclick="window.print()">🖨️ ดาวน์โหลด / พิมพ์เก็บไว้</button>
+      <p class="hint" style="text-align:center;margin-top:8px;">กดแล้วเลือก "บันทึกเป็น PDF" จากเมนูพิมพ์ของเครื่องเพื่อเก็บไฟล์ไว้</p>
     </div>
   </section>
 
@@ -311,11 +337,88 @@ function loadPayslip(){
     const box = document.getElementById('payslipHistoryBox');
     if(!rows || !rows.length || rows.error){ box.innerHTML = '<p class="hint">ยังไม่มีประวัติสลิปย้อนหลัง</p>'; return; }
     box.innerHTML = rows.map(r=>`
-      <div class="item" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>${thaiMonthLabel_(r.month)}</span>
+      <div class="slip-row" onclick="openPayslipDetail('${r.month}')">
+        <span>${thaiMonthLabel_(r.month)} ›</span>
         <strong>${Number(r.netPay).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</strong>
       </div>`).join('');
   });
+}
+function moneyTH_(n){ return Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function openPayslipDetail(month){
+  document.getElementById('view-payslip').style.display = 'none';
+  document.getElementById('view-payslip-detail').style.display = 'block';
+  document.getElementById('tabbar').style.display = 'none';
+  const box = document.getElementById('payslipDetailBox');
+  box.innerHTML = '<p class="hint">กำลังโหลด...</p>';
+  apiGet('getPayslipDetail', { empId: EMP_ID, month }).then(r=>{
+    if(!r.found){ box.innerHTML = '<p class="hint">ไม่พบข้อมูลสลิปเดือนนี้</p>'; return; }
+    box.innerHTML = renderSlipDetailHtml_(r.month, r.detail||{}, r.netPay);
+  }).catch(()=>{ box.innerHTML = '<p class="hint">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</p>'; });
+}
+function closePayslipDetail(){
+  document.getElementById('view-payslip-detail').style.display = 'none';
+  document.getElementById('view-payslip').style.display = 'block';
+  document.getElementById('tabbar').style.display = 'flex';
+}
+function renderSlipDetailHtml_(month, d, netPayFallback){
+  const netPay = (d.netPay!==undefined) ? d.netPay : netPayFallback;
+  const company = d.companyName || 'บริษัท';
+  const name = d.empName || EMP_NAME || '';
+  if(d.salaryType === 'freelance'){
+    return `
+      <h2 style="margin-top:0;">${company}</h2>
+      <p class="hint">ใบสรุปจ่ายงานฟรีแลนซ์ ประจำเดือน${thaiMonthLabel_(month)}</p>
+      <table class="slip-table">
+        <tr><td>ชื่อ</td><td>${name}</td></tr>
+        <tr><td>ตำแหน่ง/งานที่รับ</td><td>${d.position||'-'}</td></tr>
+        <tr><td>รายละเอียดงาน</td><td>${d.note||'-'}</td></tr>
+      </table>
+      <div class="slip-section-title">สรุปยอด</div>
+      <table class="slip-table">
+        <tr><td>ยอดรวมงานเดือนนี้</td><td>${moneyTH_(d.amount)}</td></tr>
+        <tr><td>หัก ณ ที่จ่าย (3%)</td><td>-${moneyTH_(d.wht)}</td></tr>
+        <tr class="slip-total-row"><td>ยอดจ่ายสุทธิ</td><td>${moneyTH_(netPay)} บาท</td></tr>
+      </table>
+      <p class="hint" style="margin-top:12px;">เอกสารนี้เป็นการคำนวณเบื้องต้น ผู้รับเงินมีหน้าที่นำหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) ไปยื่นภาษีเงินได้บุคคลธรรมดาด้วยตนเอง</p>
+    `;
+  }
+  const salaryTypeLabel = d.salaryType==='monthly' ? 'รายเดือน' : d.salaryType==='daily' ? 'รายวัน' : (d.salaryType||'-');
+  const lr = d.leaveRemaining || {};
+  return `
+    <h2 style="margin-top:0;">${company}</h2>
+    <p class="hint">สลิปเงินเดือน ประจำเดือน${thaiMonthLabel_(month)}</p>
+    <table class="slip-table">
+      <tr><td>ชื่อพนักงาน</td><td>${name}</td></tr>
+      <tr><td>ตำแหน่ง</td><td>${d.position||'-'}</td></tr>
+      <tr><td>ประเภทค่าจ้าง</td><td>${salaryTypeLabel}</td></tr>
+    </table>
+    <div class="slip-section-title">รายรับ</div>
+    <table class="slip-table">
+      <tr><td>เงินเดือนฐาน</td><td>${moneyTH_(d.baseSalary)}</td></tr>
+      <tr><td>OT วันทำงาน (${d.otHours||0} ชม.)</td><td>${moneyTH_(d.otPay)}</td></tr>
+      <tr><td>ทำงานวันหยุด (${d.holidayHours||0} ชม.)</td><td>${moneyTH_(d.holidayWorkPay)}</td></tr>
+      <tr><td>OT วันหยุด (${d.otHolidayHours||0} ชม.)</td><td>${moneyTH_(d.otHolidayPay)}</td></tr>
+      <tr><td>โบนัส${d.bonusType==='percent'? ' ('+d.bonusPercent+'%)':''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
+      ${d.bonusAnnual>0 ? '<tr><td>โบนัสประจำปี</td><td>'+moneyTH_(d.bonusAnnual)+'</td></tr>' : ''}
+      <tr><td>ค่าน้ำมัน</td><td>${moneyTH_(d.oil)}</td></tr>
+      <tr><td>ค่าไลฟ์ (${d.liveHours||0} ชม.)</td><td>${moneyTH_(d.livePay)}</td></tr>
+      <tr><td>ค่าวิดีโอ (${d.videoClips||0} คลิป)</td><td>${moneyTH_(d.videoPay)}</td></tr>
+    </table>
+    <div class="slip-section-title">รายการหัก</div>
+    <table class="slip-table">
+      <tr><td>ลาไม่รับค่าจ้าง (${d.leaveUnpaidDays||0} วัน)</td><td>-${moneyTH_(d.unpaidDeduction)}</td></tr>
+      <tr><td>ประกันสังคม${d.noSS? ' (ยกเว้น)':''}</td><td>-${moneyTH_(d.ssDeduction)}</td></tr>
+      ${d.whtEnabled ? '<tr><td>หัก ณ ที่จ่าย</td><td>-'+moneyTH_(d.whtDeduction)+'</td></tr>' : ''}
+      <tr class="slip-total-row"><td>เงินเดือนสุทธิ</td><td>${moneyTH_(netPay)} บาท</td></tr>
+    </table>
+    <div class="slip-section-title">สรุปวันลา (เดือนนี้ / คงเหลือทั้งปี)</div>
+    <table class="slip-table">
+      <tr><td>ลาป่วย</td><td>${d.leaveSick||0} วัน (คงเหลือ ${lr.sick!==undefined? lr.sick.toFixed(1):'-'} วัน)</td></tr>
+      <tr><td>ลากิจ</td><td>${d.leavePersonal||0} วัน (คงเหลือ ${lr.personal!==undefined? lr.personal.toFixed(1):'-'} วัน)</td></tr>
+      <tr><td>ลาพักร้อน</td><td>${d.leaveAnnual||0} วัน (คงเหลือ ${lr.annual!==undefined? lr.annual.toFixed(1):'-'} วัน)</td></tr>
+    </table>
+    <p class="hint" style="margin-top:12px;">เอกสารนี้เป็นการคำนวณเบื้องต้นจากข้อมูลที่บันทึกในระบบ โปรดตรวจสอบความถูกต้องก่อนใช้เป็นเอกสารทางการ</p>
+  `;
 }
 initApp();
 </script>

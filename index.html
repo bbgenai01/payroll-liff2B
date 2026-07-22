@@ -111,7 +111,11 @@
     <div class="card">
       <h2>💰 เงินเดือนล่าสุด</h2>
       <div id="payslipBox"><p class="hint">กำลังโหลด...</p></div>
-      <p class="hint">ดูรายละเอียดเต็มได้จากแอดมิน — หน้านี้แสดงเฉพาะยอดสุทธิล่าสุดเท่านั้น</p>
+      <p class="hint">ดูรายละเอียดเต็มได้จากแอดมิน — หน้านี้แสดงเฉพาะยอดสุทธิเท่านั้น</p>
+    </div>
+    <div class="card">
+      <h2>🗓️ ประวัติย้อนหลัง</h2>
+      <div id="payslipHistoryBox"><p class="hint">กำลังโหลด...</p></div>
     </div>
   </section>
 
@@ -290,11 +294,27 @@ function loadHistory(){
       </div>`).join('');
   });
 }
+const THAI_MONTHS_ = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function thaiMonthLabel_(monthStr){
+  const parts = String(monthStr).split('-');
+  const y = Number(parts[0]), m = Number(parts[1]);
+  if(!y || !m) return monthStr;
+  return `${THAI_MONTHS_[m]} ${y+543}`;
+}
 function loadPayslip(){
   apiGet('getPayslipSummary', { empId: EMP_ID }).then(r=>{
     const box = document.getElementById('payslipBox');
     if(!r.found){ box.innerHTML = '<p class="hint">ยังไม่มีข้อมูลสลิปเงินเดือน (แอดมินยังไม่ได้ซิงก์ข้อมูล)</p>'; return; }
-    box.innerHTML = `<div class="kpi" style="max-width:200px;"><div class="num">${Number(r.netPay).toLocaleString('th-TH',{minimumFractionDigits:2})}</div><div class="lbl">สุทธิ เดือน ${r.month}</div></div>`;
+    box.innerHTML = `<div class="kpi" style="max-width:200px;"><div class="num">${Number(r.netPay).toLocaleString('th-TH',{minimumFractionDigits:2})}</div><div class="lbl">สุทธิ เดือน ${thaiMonthLabel_(r.month)}</div></div>`;
+  });
+  apiGet('getPayslipHistory', { empId: EMP_ID }).then(rows=>{
+    const box = document.getElementById('payslipHistoryBox');
+    if(!rows || !rows.length || rows.error){ box.innerHTML = '<p class="hint">ยังไม่มีประวัติสลิปย้อนหลัง</p>'; return; }
+    box.innerHTML = rows.map(r=>`
+      <div class="item" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>${thaiMonthLabel_(r.month)}</span>
+        <strong>${Number(r.netPay).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</strong>
+      </div>`).join('');
   });
 }
 initApp();

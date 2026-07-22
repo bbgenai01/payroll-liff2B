@@ -12,7 +12,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>ระบบลาออนไลน์</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" onerror="window.HTML2CANVAS_LOAD_FAILED=true"></script>
 <style>
   :root{ --primary:#dc2626; --primary-dark:#a91d1d; --bg:#f3f4f6; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --green:#16a34a; --amber:#d97706; }
   *{box-sizing:border-box;}
@@ -50,20 +49,7 @@
   .slip-table td:last-child{ text-align:right; }
   .slip-section-title{ font-weight:700; color:var(--primary-dark); margin:14px 0 4px; font-size:13px; }
   .slip-total-row td{ font-weight:700; font-size:16px; border-top:2px solid var(--text); padding-top:8px; }
-  @media print{
-    header, nav.tabbar, #toast, .no-print{ display:none !important; }
-    body{ padding-bottom:0; background:#fff; }
-    main{ max-width:100%; padding:0; }
-    .card{ box-shadow:none; }
-  }
-  #imageSaveOverlay{
-    display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:500;
-    flex-direction:column; align-items:center; justify-content:center; padding:16px; gap:12px;
-  }
-  #imageSaveOverlay.show{ display:flex; }
-  #imageSaveOverlay img{ max-width:100%; max-height:65vh; border-radius:8px; background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.4); }
-  #imageSaveOverlay .hint-white{ color:#fff; font-size:13px; text-align:center; margin:0; }
-  #imageSaveOverlay .btn{ width:auto; padding:10px 20px; text-decoration:none; text-align:center; display:inline-block; }
+  .no-print{ /* kept for layout compatibility */ }
 </style>
 </head>
 <body>
@@ -136,7 +122,7 @@
     </div>
     <div class="card">
       <h2>🗓️ ประวัติย้อนหลัง</h2>
-      <p class="hint">แตะรายการเดือนที่ต้องการ เพื่อดูรายละเอียดเต็มและดาวน์โหลด/พิมพ์เก็บไว้ได้</p>
+      <p class="hint">แตะรายการเดือนที่ต้องการ เพื่อดูรายละเอียดเต็ม</p>
       <div id="payslipHistoryBox"><p class="hint">กำลังโหลด...</p></div>
     </div>
   </section>
@@ -148,11 +134,6 @@
     <div class="card">
       <div id="payslipDetailBox"><p class="hint">กำลังโหลด...</p></div>
     </div>
-    <div class="card no-print">
-      <button class="btn" onclick="saveSlipAsImage()">📷 บันทึกเป็นรูปภาพ (แนะนำ)</button>
-      <button class="btn secondary" style="margin-top:8px;" onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
-      <p class="hint" style="text-align:center;margin-top:8px;">ถ้าเปิดผ่านแอป LINE แล้วกด "พิมพ์" ไม่มีอะไรเกิดขึ้น ให้ใช้ปุ่ม "บันทึกเป็นรูปภาพ" แทน — จะได้รูปให้กดค้างเพื่อบันทึกลงเครื่องได้ทันที</p>
-    </div>
   </section>
 
 </main>
@@ -162,13 +143,6 @@
   <button onclick="showView('history', this)">🗂️ ประวัติ</button>
   <button onclick="showView('payslip', this)">💰 เงินเดือน</button>
 </nav>
-
-<div id="imageSaveOverlay">
-  <p class="hint-white">📌 กดค้างที่รูปด้านล่าง แล้วเลือก "บันทึกรูปภาพ" เพื่อเก็บไว้ในเครื่อง</p>
-  <img id="imageSaveImg" src="" alt="สลิปเงินเดือน">
-  <a id="imageSaveDownloadLink" class="btn" download="สลิปเงินเดือน.png">⬇️ ดาวน์โหลดไฟล์ (ถ้าเบราว์เซอร์รองรับ)</a>
-  <button type="button" class="btn secondary" onclick="closeImageSaveOverlay()">ปิด</button>
-</div>
 
 <div id="toast"></div>
 
@@ -376,28 +350,6 @@ function closePayslipDetail(){
   document.getElementById('view-payslip-detail').style.display = 'none';
   document.getElementById('view-payslip').style.display = 'block';
   document.getElementById('tabbar').style.display = 'flex';
-}
-async function saveSlipAsImage(){
-  // window.print() มักใช้ไม่ได้ในเบราว์เซอร์ในแอป LINE (in-app browser) — ทางนี้แปลงสลิปเป็นรูปภาพแทน
-  // แล้วให้พนักงานกดค้างที่รูปเพื่อบันทึกลงเครื่อง (วิธีนี้ใช้ได้แม้ใน LINE)
-  if(typeof html2canvas === 'undefined' || window.HTML2CANVAS_LOAD_FAILED){
-    toast('โหลดตัวสร้างรูปภาพไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
-    return;
-  }
-  const el = document.getElementById('payslipDetailBox');
-  toast('กำลังสร้างรูปภาพ...');
-  try{
-    const canvas = await html2canvas(el, { scale:2, backgroundColor:'#ffffff' });
-    const dataUrl = canvas.toDataURL('image/png');
-    document.getElementById('imageSaveImg').src = dataUrl;
-    document.getElementById('imageSaveDownloadLink').href = dataUrl;
-    document.getElementById('imageSaveOverlay').classList.add('show');
-  }catch(err){
-    toast('สร้างรูปภาพไม่สำเร็จ: ' + err.message);
-  }
-}
-function closeImageSaveOverlay(){
-  document.getElementById('imageSaveOverlay').classList.remove('show');
 }
 function renderSlipDetailHtml_(month, d, netPayFallback){
   const netPay = (d.netPay!==undefined) ? d.netPay : netPayFallback;

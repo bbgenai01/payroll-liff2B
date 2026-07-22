@@ -1,0 +1,303 @@
+<!--
+  ไฟล์นี้สำหรับอัปโหลดขึ้น GitHub Pages (หรือโฮสต์ static อื่นๆ) โดยตรง
+  ต่างจาก liff.html เดิมตรงที่ใส่ค่า LIFF_ID และ API_URL ตายตัวไว้เลย
+  (ไม่ใช้ Apps Script templating <?= ?> เพราะไฟล์นี้ไม่ได้รันผ่าน Apps Script)
+  ชื่อไฟล์ต้องเป็น "index.html" เป๊ะๆ ตอนอัปโหลดขึ้น GitHub ถึงจะเปิดเป็นหน้าแรกอัตโนมัติ
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ระบบลาออนไลน์</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{ --primary:#dc2626; --primary-dark:#a91d1d; --bg:#f3f4f6; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --green:#16a34a; --amber:#d97706; }
+  *{box-sizing:border-box;}
+  body{ font-family:'Sarabun','Tahoma',sans-serif; margin:0; background:var(--bg); color:var(--text); font-size:15px; padding-bottom:70px; }
+  header{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; padding:16px; text-align:center; }
+  header h1{ margin:0; font-size:18px; }
+  header p{ margin:4px 0 0; font-size:12px; opacity:.9; }
+  main{ padding:14px; max-width:480px; margin:0 auto; }
+  .card{ background:#fff; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card h2{ margin:0 0 12px; font-size:16px; }
+  .field{ margin-bottom:10px; }
+  .field label{ display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px; }
+  input,select,textarea{ width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; }
+  button.btn{ width:100%; padding:12px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  button.btn.secondary{ background:#e5e7eb; color:var(--text); }
+  .kpi-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .kpi{ background:#fdf2f2; border-radius:8px; padding:10px; text-align:center; }
+  .kpi .num{ font-size:18px; font-weight:700; color:var(--primary-dark); }
+  .kpi .lbl{ font-size:11px; color:var(--muted); }
+  .item{ border-bottom:1px solid var(--border); padding:8px 0; font-size:13px; }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .badge.pending{ background:#fef3c7; color:#92400e; }
+  .badge.approved{ background:#dcfce7; color:#166534; }
+  .badge.rejected{ background:#fee2e2; color:#991b1b; }
+  nav.tabbar{ position:fixed; bottom:0; left:0; right:0; display:flex; background:#fff; border-top:1px solid var(--border); }
+  nav.tabbar button{ flex:1; padding:10px 4px; border:none; background:none; font-size:11px; color:var(--muted); font-family:inherit; }
+  nav.tabbar button.active{ color:var(--primary); font-weight:700; }
+  #loadingBox, #linkBox{ text-align:center; padding:40px 16px; }
+  .hint{ font-size:12px; color:var(--muted); }
+  #toast{ position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; display:none; z-index:99; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 ระบบลาออนไลน์</h1>
+  <p id="empNameTag">กำลังโหลด...</p>
+</header>
+
+<div id="loadingBox">
+  <p>กำลังเชื่อมต่อ LINE...</p>
+</div>
+
+<div id="linkBox" style="display:none;">
+  <div class="card" style="max-width:400px;margin:20px auto;">
+    <h2>ยืนยันตัวตนครั้งแรก</h2>
+    <p class="hint">กรอกรหัสพนักงานของคุณ (สอบถามจากแอดมิน) เพื่อผูกบัญชี LINE นี้กับข้อมูลพนักงาน — ทำครั้งเดียวเท่านั้น</p>
+    <div class="field"><label>รหัสพนักงาน</label><input type="text" id="linkCode" placeholder="เช่น 1008"></div>
+    <button class="btn" onclick="doLink()">ยืนยัน</button>
+    <p class="hint" id="linkError" style="color:var(--primary); display:none;"></p>
+  </div>
+</div>
+
+<main id="mainApp" style="display:none;">
+
+  <section id="view-leave">
+    <div class="card">
+      <h2>🙋 กดลา</h2>
+      <form id="leaveForm" onsubmit="submitLeave(event)">
+        <div class="field"><label>วันที่ *</label><input type="date" id="lfDate" required></div>
+        <div class="field">
+          <label>ประเภทการลา</label>
+          <select id="lfType" onchange="toggleEvidence()">
+            <option value="sick">ลาป่วย</option>
+            <option value="personal">ลากิจ</option>
+            <option value="annual">ลาพักร้อน</option>
+            <option value="unpaid">ลาไม่รับค่าจ้าง</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>จำนวนวัน</label>
+          <select id="lfDays"><option value="1">เต็มวัน (1)</option><option value="0.5">ครึ่งวัน (0.5)</option></select>
+        </div>
+        <div class="field"><label>เหตุผล</label><input type="text" id="lfReason" placeholder="ระบุสั้นๆ"></div>
+        <div class="field" id="evidenceField" style="display:none;">
+          <label>แนบรูปใบรับรองแพทย์ (ถ้ามี โดยเฉพาะลาป่วย 3 วันขึ้นไป)</label>
+          <input type="file" id="lfEvidence" accept="image/*">
+        </div>
+        <button type="submit" class="btn">ส่งคำขอลา</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📅 วันลาคงเหลือปีนี้</h2>
+      <div class="kpi-row" id="balanceRow"><div class="kpi"><div class="num">-</div><div class="lbl">กำลังโหลด</div></div></div>
+    </div>
+  </section>
+
+  <section id="view-history" style="display:none;">
+    <div class="card">
+      <h2>🗂️ ประวัติการลา</h2>
+      <div id="historyList"><p class="hint">กำลังโหลด...</p></div>
+    </div>
+  </section>
+
+  <section id="view-payslip" style="display:none;">
+    <div class="card">
+      <h2>💰 เงินเดือนล่าสุด</h2>
+      <div id="payslipBox"><p class="hint">กำลังโหลด...</p></div>
+      <p class="hint">ดูรายละเอียดเต็มได้จากแอดมิน — หน้านี้แสดงเฉพาะยอดสุทธิล่าสุดเท่านั้น</p>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar" id="tabbar" style="display:none;">
+  <button class="active" onclick="showView('leave', this)">🙋 กดลา</button>
+  <button onclick="showView('history', this)">🗂️ ประวัติ</button>
+  <button onclick="showView('payslip', this)">💰 เงินเดือน</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB5G-T6mOMav2A3AIRpnf-R_o1-29FKoSxAjcwgTXr7f3_/exec';
+const LIFF_ID = '2010792715-tsR0YQFR';
+let EMP_ID = null, EMP_NAME = null, LINE_USER_ID = null;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display='block';
+  clearTimeout(window._t); window._t = setTimeout(()=>{ t.style.display='none'; }, 2500);
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+async function apiGet(action, params){
+  const qs = new URLSearchParams(Object.assign({action}, params||{})).toString();
+  const res = await fetch(`${API_URL}?${qs}`);
+  return res.json();
+}
+async function apiPost(action, payload){
+  const res = await fetch(API_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({action}, payload))
+  });
+  return res.json();
+}
+
+function debugLog(msg){
+  const box = document.getElementById('loadingBox');
+  box.innerHTML += '<p style="font-size:12px;color:#666;text-align:left;margin:4px 0;">'+msg+'</p>';
+}
+function initApp(){
+  debugLog('เริ่มทำงาน... LIFF_ID = ' + LIFF_ID);
+  debugLog('API_URL = ' + API_URL);
+  if(typeof liff === 'undefined'){
+    debugLog('❌ ไม่พบ liff SDK (สคริปต์จาก static.line-scdn.net โหลดไม่สำเร็จ)');
+    return;
+  }
+  debugLog('พบ liff SDK แล้ว กำลังเรียก liff.init()...');
+  let settled = false;
+  setTimeout(()=>{
+    if(!settled) debugLog('⏱️ liff.init() ยังไม่ตอบกลับหลังผ่านไป 8 วินาที (น่าจะค้างจริง)');
+  }, 8000);
+  liff.init({ liffId: LIFF_ID }).then(()=>{
+    settled = true;
+    debugLog('✅ liff.init() สำเร็จ');
+    debugLog('isLoggedIn = ' + liff.isLoggedIn());
+    debugLog('isInClient = ' + liff.isInClient());
+    if(!liff.isLoggedIn()){
+      debugLog('ยังไม่ login กำลังเรียก liff.login()...');
+      liff.login();
+      return Promise.reject('__redirecting__');
+    }
+    debugLog('กำลังเรียก liff.getProfile()...');
+    return liff.getProfile();
+  }).then(profile=>{
+    settled = true;
+    debugLog('✅ getProfile สำเร็จ: ' + profile.displayName);
+    LINE_USER_ID = profile.userId;
+    checkLink();
+  }).catch(err=>{
+    settled = true;
+    if(err==='__redirecting__') return; // กำลังเด้งไปหน้า login ของ LINE ตามปกติ
+    debugLog('❌ ผิดพลาด: ' + JSON.stringify(err));
+  });
+}
+function checkLink(){
+  apiGet('getProfile', { lineUserId: LINE_USER_ID }).then(r=>{
+    document.getElementById('loadingBox').style.display='none';
+    if(r.linked){
+      EMP_ID = r.empId; EMP_NAME = r.name;
+      startMainApp();
+    } else {
+      document.getElementById('linkBox').style.display='block';
+    }
+  });
+}
+function doLink(){
+  const code = document.getElementById('linkCode').value.trim();
+  if(!code){ toast('กรุณากรอกรหัสพนักงาน'); return; }
+  apiPost('linkEmployee', { lineUserId: LINE_USER_ID, empCode: code }).then(r=>{
+    if(r.error){
+      document.getElementById('linkError').textContent = r.error;
+      document.getElementById('linkError').style.display='block';
+      return;
+    }
+    EMP_ID = r.empId; EMP_NAME = r.name;
+    document.getElementById('linkBox').style.display='none';
+    startMainApp();
+  });
+}
+function startMainApp(){
+  document.getElementById('empNameTag').textContent = EMP_NAME + (EMP_ID? '':'');
+  document.getElementById('mainApp').style.display='block';
+  document.getElementById('tabbar').style.display='flex';
+  document.getElementById('lfDate').value = todayISO();
+  toggleEvidence();
+  loadBalance();
+}
+function showView(name, btn){
+  ['leave','history','payslip'].forEach(v=>{
+    document.getElementById('view-'+v).style.display = (v===name) ? 'block':'none';
+  });
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(name==='history') loadHistory();
+  if(name==='payslip') loadPayslip();
+}
+function toggleEvidence(){
+  const type = document.getElementById('lfType').value;
+  document.getElementById('evidenceField').style.display = type==='sick' ? 'block':'none';
+}
+function submitLeave(e){
+  e.preventDefault();
+  const date = document.getElementById('lfDate').value;
+  const leaveType = document.getElementById('lfType').value;
+  const leaveDays = parseFloat(document.getElementById('lfDays').value);
+  const reason = document.getElementById('lfReason').value.trim();
+  const fileInput = document.getElementById('lfEvidence');
+  const file = fileInput.files[0];
+  const send = (evidenceBase64)=>{
+    apiPost('submitLeave', {
+      empId: EMP_ID, empName: EMP_NAME, date, leaveType, leaveDays, reason,
+      evidenceBase64: evidenceBase64||'', evidenceFileName: file? file.name : '', source:'line'
+    }).then(r=>{
+      if(r.error){ toast(r.error); return; }
+      toast('ส่งคำขอลาแล้ว รอแอดมินอนุมัติ');
+      document.getElementById('leaveForm').reset();
+      document.getElementById('lfDate').value = todayISO();
+      toggleEvidence();
+      loadBalance();
+    });
+  };
+  if(file){
+    const reader = new FileReader();
+    reader.onload = ()=> send(reader.result);
+    reader.readAsDataURL(file);
+  } else {
+    send(null);
+  }
+}
+function loadBalance(){
+  const year = String(new Date().getFullYear());
+  apiGet('getLeaveBalance', { empId: EMP_ID, year }).then(r=>{
+    if(r.error) return;
+    document.getElementById('balanceRow').innerHTML = `
+      <div class="kpi"><div class="num">${r.sick.remaining}</div><div class="lbl">ลาป่วยคงเหลือ</div></div>
+      <div class="kpi"><div class="num">${r.personal.remaining}</div><div class="lbl">ลากิจคงเหลือ</div></div>
+      <div class="kpi"><div class="num">${r.annual.remaining}</div><div class="lbl">พักร้อนคงเหลือ</div></div>
+    `;
+  });
+}
+const LEAVE_TYPE_LABEL = { sick:'ลาป่วย', personal:'ลากิจ', annual:'ลาพักร้อน', unpaid:'ลาไม่รับค่าจ้าง' };
+const STATUS_LABEL = { pending:'รออนุมัติ', approved:'อนุมัติแล้ว', rejected:'ไม่อนุมัติ' };
+function loadHistory(){
+  apiGet('getMyLeaves', { empId: EMP_ID }).then(rows=>{
+    const box = document.getElementById('historyList');
+    if(!rows.length){ box.innerHTML = '<p class="hint">ยังไม่มีประวัติการลา</p>'; return; }
+    box.innerHTML = rows.map(r=>`
+      <div class="item">
+        ${r.Date} — ${LEAVE_TYPE_LABEL[r.LeaveType]||r.LeaveType} ${r.LeaveDays} วัน
+        <span class="badge ${r.Status}">${STATUS_LABEL[r.Status]||r.Status}</span>
+        ${r.Reason? '<br><span class="hint">'+r.Reason+'</span>' : ''}
+      </div>`).join('');
+  });
+}
+function loadPayslip(){
+  apiGet('getPayslipSummary', { empId: EMP_ID }).then(r=>{
+    const box = document.getElementById('payslipBox');
+    if(!r.found){ box.innerHTML = '<p class="hint">ยังไม่มีข้อมูลสลิปเงินเดือน (แอดมินยังไม่ได้ซิงก์ข้อมูล)</p>'; return; }
+    box.innerHTML = `<div class="kpi" style="max-width:200px;"><div class="num">${Number(r.netPay).toLocaleString('th-TH',{minimumFractionDigits:2})}</div><div class="lbl">สุทธิ เดือน ${r.month}</div></div>`;
+  });
+}
+initApp();
+</script>
+</body>
+</html>

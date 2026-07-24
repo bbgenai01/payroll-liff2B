@@ -227,7 +227,10 @@ async function apiPost(action, payload){
   return res.json();
 }
 
+// รายละเอียดการเชื่อมต่อ (LIFF_ID, API_URL, ขั้นตอน login) ซ่อนไว้ตามปกติ — เห็นเฉพาะตอนเปิดลิงก์ต่อท้ายด้วย ?debug=1 (ใช้ตรวจปัญหาเวลาเชื่อมต่อ LINE ไม่ได้)
+const DEBUG_MODE_ = new URLSearchParams(location.search).get('debug') === '1';
 function debugLog(msg){
+  if(!DEBUG_MODE_) return;
   const box = document.getElementById('loadingBox');
   box.innerHTML += '<p style="font-size:12px;color:#666;text-align:left;margin:4px 0;">'+msg+'</p>';
 }

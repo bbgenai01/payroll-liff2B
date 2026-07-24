@@ -37,7 +37,7 @@
   .badge.approved{ background:#dcfce7; color:#166534; }
   .badge.rejected{ background:#fee2e2; color:#991b1b; }
   nav.tabbar{ position:fixed; bottom:0; left:0; right:0; display:flex; background:#fff; border-top:1px solid var(--border); }
-  nav.tabbar button{ flex:1; padding:10px 4px; border:none; background:none; font-size:11px; color:var(--muted); font-family:inherit; }
+  nav.tabbar button{ flex:1; padding:9px 2px; border:none; background:none; font-size:10.5px; color:var(--muted); font-family:inherit; }
   nav.tabbar button.active{ color:var(--primary); font-weight:700; }
   #loadingBox, #linkBox{ text-align:center; padding:40px 16px; }
   .hint{ font-size:12px; color:var(--muted); }
@@ -136,12 +136,67 @@
     </div>
   </section>
 
+  <section id="view-video" style="display:none;">
+    <div class="card">
+      <h2>🎥 ส่งวิดีโอ/ไลฟ์</h2>
+      <p class="hint">แนบลิงก์วิดีโอ/ไลฟ์ที่อัปโหลดไว้แล้ว (เช่น ไลน์ Keep, Google Drive, Facebook) ส่งให้แอดมินตรวจสอบก่อนนับเข้ายอด</p>
+      <form id="videoForm" onsubmit="submitVideo(event)">
+        <div class="field"><label>เดือน/ปี *</label><input type="month" id="vfMonth" required></div>
+        <div class="field">
+          <label>ประเภท</label>
+          <select id="vfKind" onchange="toggleVideoFields()">
+            <option value="live">ไลฟ์</option>
+            <option value="video">วิดีโอ</option>
+          </select>
+        </div>
+        <div id="vfLiveFields">
+          <div class="field">
+            <label>แพลตฟอร์ม</label>
+            <select id="vfPlatform">
+              <option value="shopee">Shopee</option>
+              <option value="facebook">Facebook</option>
+              <option value="tiktok">TikTok</option>
+            </select>
+          </div>
+          <div class="field"><label>ชั่วโมงไลฟ์</label><input type="number" step="0.25" id="vfHours" value="1"></div>
+        </div>
+        <div id="vfVideoFields" style="display:none;">
+          <div class="field">
+            <label>ประเภทวิดีโอ</label>
+            <select id="vfVideoType">
+              <option value="withVoice">ลงเสียง</option>
+              <option value="noVoice">ไม่ลงเสียง</option>
+            </select>
+          </div>
+          <div class="field"><label>จำนวนคลิป</label><input type="number" step="1" id="vfClips" value="1"></div>
+        </div>
+        <div class="field"><label>ลิงก์วิดีโอ/ไลฟ์ *</label><input type="url" id="vfLink" placeholder="วางลิงก์ที่นี่" required></div>
+        <div class="field"><label>หมายเหตุ</label><input type="text" id="vfNote" placeholder="ระบุสั้นๆ (ถ้ามี)"></div>
+        <button type="submit" class="btn">ส่งให้ตรวจสอบ</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>📋 สถานะที่ส่งไปแล้ว</h2>
+      <div id="videoHistoryList"><p class="hint">กำลังโหลด...</p></div>
+    </div>
+  </section>
+
+  <section id="view-calendar" style="display:none;">
+    <div class="card">
+      <h2>📅 ปฏิทินงาน/วันหยุด</h2>
+      <p class="hint">🔴 วันหยุดบริษัท &nbsp; 🟣 งานที่ครบกำหนด — แสดงเหตุการณ์ใน 60 วันข้างหน้า</p>
+      <div id="calendarList"><p class="hint">กำลังโหลด...</p></div>
+    </div>
+  </section>
+
 </main>
 
 <nav class="tabbar" id="tabbar" style="display:none;">
   <button class="active" onclick="showView('leave', this)">🙋 กดลา</button>
   <button onclick="showView('history', this)">🗂️ ประวัติ</button>
   <button onclick="showView('payslip', this)">💰 เงินเดือน</button>
+  <button onclick="showView('video', this)">🎥 วิดีโอ</button>
+  <button onclick="showView('calendar', this)">📅 ปฏิทิน</button>
 </nav>
 
 <div id="toast"></div>
@@ -243,15 +298,29 @@ function startMainApp(){
   document.getElementById('lfDate').value = todayISO();
   toggleEvidence();
   loadBalance();
+  applyDeepLinkView();
 }
+const TABS_ = ['leave','history','payslip','video','calendar'];
 function showView(name, btn){
-  ['leave','history','payslip'].forEach(v=>{
+  TABS_.forEach(v=>{
     document.getElementById('view-'+v).style.display = (v===name) ? 'block':'none';
   });
   document.querySelectorAll('#tabbar button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(name==='history') loadHistory();
   if(name==='payslip') loadPayslip();
+  if(name==='video') loadVideoTab();
+  if(name==='calendar') loadCalendar();
+}
+function applyDeepLinkView(){
+  // รองรับริชเมนู LINE ที่ลิงก์มาที่หน้านี้พร้อมพารามิเตอร์ ?view=video หรือ ?view=calendar เพื่อเปิดแท็บนั้นให้อัตโนมัติ
+  try{
+    const view = new URLSearchParams(location.search).get('view');
+    const idx = TABS_.indexOf(view);
+    if(idx === -1) return;
+    const btn = document.querySelectorAll('#tabbar button')[idx];
+    if(btn) showView(view, btn);
+  }catch(e){ /* เบราว์เซอร์เก่าบางตัวอาจไม่รองรับ URLSearchParams — ข้ามไปเงียบๆ ใช้แท็บเริ่มต้นแทน */ }
 }
 function toggleEvidence(){
   const type = document.getElementById('lfType').value;
@@ -317,6 +386,12 @@ function thaiMonthLabel_(monthStr){
   const y = Number(parts[0]), m = Number(parts[1]);
   if(!y || !m) return monthStr;
   return `${THAI_MONTHS_[m]} ${y+543}`;
+}
+function thaiDateLabel_(dateStr){
+  const parts = String(dateStr).split('-').map(Number);
+  const y=parts[0], m=parts[1], d=parts[2];
+  if(!y || !m || !d) return dateStr;
+  return `${d} ${THAI_MONTHS_[m]} ${y+543}`;
 }
 function loadPayslip(){
   apiGet('getPayslipSummary', { empId: EMP_ID }).then(r=>{
@@ -411,6 +486,71 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
     <p class="hint" style="margin-top:12px;">เอกสารนี้เป็นการคำนวณเบื้องต้นจากข้อมูลที่บันทึกในระบบ โปรดตรวจสอบความถูกต้องก่อนใช้เป็นเอกสารทางการ</p>
   `;
 }
+/* ---------------- ส่งวิดีโอ/ไลฟ์ ---------------- */
+function toggleVideoFields(){
+  const kind = document.getElementById('vfKind').value;
+  document.getElementById('vfLiveFields').style.display = kind==='live' ? 'block':'none';
+  document.getElementById('vfVideoFields').style.display = kind==='video' ? 'block':'none';
+}
+function submitVideo(e){
+  e.preventDefault();
+  const month = document.getElementById('vfMonth').value;
+  if(!month){ toast('กรุณาเลือกเดือน'); return; }
+  const kind = document.getElementById('vfKind').value;
+  const linkUrl = document.getElementById('vfLink').value.trim();
+  if(!linkUrl){ toast('กรุณาแปะลิงก์วิดีโอ/ไลฟ์'); return; }
+  const note = document.getElementById('vfNote').value.trim();
+  const payload = { empId: EMP_ID, empName: EMP_NAME, month, kind, linkUrl, note, source:'line' };
+  if(kind==='live'){
+    payload.platform = document.getElementById('vfPlatform').value;
+    payload.hours = parseFloat(document.getElementById('vfHours').value)||0;
+  } else {
+    payload.videoType = document.getElementById('vfVideoType').value;
+    payload.clips = parseInt(document.getElementById('vfClips').value, 10)||0;
+  }
+  apiPost('submitVideo', payload).then(r=>{
+    if(r.error){ toast(r.error); return; }
+    toast('ส่งให้ตรวจสอบแล้ว รอแอดมินอนุมัติ');
+    document.getElementById('vfLink').value = '';
+    document.getElementById('vfNote').value = '';
+    loadVideoHistory();
+  });
+}
+const VIDEO_STATUS_LABEL_ = { pending:'รอตรวจสอบ', approved:'อนุมัติแล้ว', rejected:'ไม่อนุมัติ' };
+function loadVideoHistory(){
+  apiGet('getMyVideoSubmissions', { empId: EMP_ID }).then(rows=>{
+    const box = document.getElementById('videoHistoryList');
+    if(!rows || !rows.length || rows.error){ box.innerHTML = '<p class="hint">ยังไม่เคยส่งวิดีโอ</p>'; return; }
+    box.innerHTML = rows.map(r=>`
+      <div class="item">
+        ${thaiMonthLabel_(r.Month)} — ${r.Kind==='live'?'ไลฟ์':'วิดีโอ'} ${r.Kind==='live'? ((r.Hours||0)+' ชม.') : ((r.Clips||0)+' คลิป')}
+        <span class="badge ${r.Status}">${VIDEO_STATUS_LABEL_[r.Status]||r.Status}</span>
+        ${r.Note? '<br><span class="hint">'+r.Note+'</span>' : ''}
+      </div>`).join('');
+  });
+}
+function loadVideoTab(){
+  if(!document.getElementById('vfMonth').value){
+    document.getElementById('vfMonth').value = new Date().toISOString().slice(0,7);
+  }
+  toggleVideoFields();
+  loadVideoHistory();
+}
+
+/* ---------------- ปฏิทิน (วันหยุด + Asana) ---------------- */
+const CAL_SOURCE_ICON_ = { holiday:'🔴', asana:'🟣', manual:'🔵' };
+function loadCalendar(){
+  apiGet('getCalendar', { days: 60 }).then(rows=>{
+    const box = document.getElementById('calendarList');
+    if(!rows || !rows.length || rows.error){ box.innerHTML = '<p class="hint">ยังไม่มีเหตุการณ์ในช่วง 60 วันข้างหน้า</p>'; return; }
+    box.innerHTML = rows.map(r=>`
+      <div class="item">
+        <strong>${thaiDateLabel_(r.date)}</strong> ${CAL_SOURCE_ICON_[r.source]||''} ${r.title}
+        ${r.detail? '<br><span class="hint">'+r.detail+'</span>' : ''}
+      </div>`).join('');
+  });
+}
+
 initApp();
 </script>
 </body>

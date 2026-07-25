@@ -65,8 +65,8 @@
 
 <main id="mainApp" style="display:none;">
   <div class="card">
-    <h2>งานและวันหยุด</h2>
-    <p class="hint">🔴 วันหยุดบริษัท &nbsp; 🟣 งานที่ครบกำหนด — แสดงงานค้างที่เลยกำหนดแล้วไว้บนสุด ตามด้วยงาน 60 วันข้างหน้า</p>
+    <h2>ปฏิทินงาน/วันหยุด</h2>
+    <p class="hint">🔴 วันหยุดบริษัท (120 วันข้างหน้า) &nbsp; 🟣 งานที่ครบกำหนด (60 วันข้างหน้า) — งานค้างที่เลยกำหนดแล้วแสดงไว้บนสุด</p>
   </div>
   <div class="card">
     <div id="calendarList"><p class="hint">กำลังโหลด...</p></div>
@@ -78,6 +78,11 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB
 // LIFF ID ของ "ปฏิทิน" (คนละอันกับระบบลา — ระบบลาคือ 2010792715-tsR0YQFR)
 const LIFF_ID = '2010792715-LiZuuYwV';
 let EMP_ID = null, EMP_NAME = null, LINE_USER_ID = null;
+
+// ระยะเวลาที่แสดงล่วงหน้า แยกกันระหว่างวันหยุดกับงาน (ปรับตัวเลขตรงนี้ได้เลย)
+const HOLIDAY_AHEAD_DAYS = 120;  // วันหยุด — มองไกล เพราะใช้วางแผนล่วงหน้า
+const TASK_AHEAD_DAYS    = 60;   // งานจาก Asana — มองใกล้ เอาเฉพาะที่ต้องทำเร็วๆ นี้
+const BACK_DAYS          = 60;   // งานค้างที่เลยกำหนดแล้ว ย้อนหลังกี่วัน
 
 const DEBUG_MODE_ = new URLSearchParams(location.search).get('debug') === '1';
 function debugLog(msg){
@@ -173,6 +178,12 @@ function todayISO_(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+function addDaysISO_(iso, days){
+  const p = String(iso).split('-').map(Number);
+  const d = new Date(p[0], p[1]-1, p[2]);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function escapeHtml_(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -196,9 +207,15 @@ function renderGroups_(rows, today, isOverdueSection){
 }
 function loadCalendar(){
   // back=60 → ดึงงานที่เลยกำหนดแล้วแต่ยังไม่เสร็จย้อนหลังมาแสดงด้วย (ระบบซิงก์เฉพาะงานที่ยังไม่ติ๊กเสร็จอยู่แล้ว)
-  apiGet('getCalendar', { days: 60, back: 60, empId: EMP_ID }).then(rows=>{
+  apiGet('getCalendar', { days: HOLIDAY_AHEAD_DAYS, back: BACK_DAYS, empId: EMP_ID }).then(all=>{
     const box = document.getElementById('calendarList');
-    if(!rows || rows.error || !rows.length){
+    // ขอข้อมูลมาช่วงยาวสุด (เท่าวันหยุด) แล้วค่อยตัดงานที่ไกลเกิน TASK_AHEAD_DAYS ออกตรงนี้
+    // วันหยุดจึงมองไกลได้ 120 วัน ส่วนงานเห็นแค่ 60 วัน
+    const taskCutoff = addDaysISO_(todayISO_(), TASK_AHEAD_DAYS);
+    const rows = (all && all.length && !all.error)
+      ? all.filter(r=> r.source === 'holiday' ? true : r.date <= taskCutoff)
+      : [];
+    if(!rows.length){
       box.innerHTML = '<p class="hint">ยังไม่มีงานหรือวันหยุดในช่วงนี้</p>';
       return;
     }
@@ -212,7 +229,7 @@ function loadCalendar(){
       html += '<div style="height:10px;"></div>';
     }
     html += `<p class="sec-title">📌 กำลังจะถึง (${upcoming.length})</p>`;
-    html += upcoming.length ? renderGroups_(upcoming, today, false) : '<p class="hint">ไม่มีงานในช่วง 60 วันข้างหน้า</p>';
+    html += upcoming.length ? renderGroups_(upcoming, today, false) : '<p class="hint">ไม่มีรายการในช่วง 120 วันข้างหน้า</p>';
     box.innerHTML = html;
   }).catch(()=>{
     document.getElementById('calendarList').innerHTML = '<p class="hint">โหลดปฏิทินไม่สำเร็จ ลองใหม่อีกครั้ง</p>';

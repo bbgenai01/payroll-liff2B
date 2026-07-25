@@ -33,6 +33,9 @@
   .ev:last-child{ border-bottom:none; }
   .ev .dot{ flex:0 0 auto; }
   .today-badge{ display:inline-block; background:#fee2e2; color:#991b1b; font-size:11px; font-weight:700; border-radius:8px; padding:1px 7px; margin-left:6px; }
+  .overdue-badge{ display:inline-block; background:#fef3c7; color:#92400e; font-size:11px; font-weight:700; border-radius:8px; padding:1px 7px; margin-left:6px; }
+  .day-group.overdue .day-head{ color:#b45309; }
+  .sec-title{ font-size:13px; font-weight:700; color:var(--muted); margin:0 0 8px; }
 </style>
 </head>
 <body>
@@ -62,8 +65,8 @@
 
 <main id="mainApp" style="display:none;">
   <div class="card">
-    <h2>งานและวันหยุด 60 วันข้างหน้า</h2>
-    <p class="hint">🔴 วันหยุดบริษัท &nbsp; 🟣 งานที่ครบกำหนด</p>
+    <h2>งานและวันหยุด</h2>
+    <p class="hint">🔴 วันหยุดบริษัท &nbsp; 🟣 งานที่ครบกำหนด — แสดงงานค้างที่เลยกำหนดแล้วไว้บนสุด ตามด้วยงาน 60 วันข้างหน้า</p>
   </div>
   <div class="card">
     <div id="calendarList"><p class="hint">กำลังโหลด...</p></div>
@@ -174,29 +177,43 @@ function escapeHtml_(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 const SOURCE_ICON_ = { holiday:'🔴', asana:'🟣', manual:'🔵' };
+function renderGroups_(rows, today, isOverdueSection){
+  const groups = {};
+  rows.forEach(r=>{ (groups[r.date] = groups[r.date] || []).push(r); });
+  return Object.keys(groups).sort().map(date=>`
+    <div class="day-group${isOverdueSection? ' overdue':''}">
+      <div class="day-head">
+        ${thaiDateLabel_(date)} <span class="dow">(${dowLabel_(date)})</span>
+        ${date===today? '<span class="today-badge">วันนี้</span>' : ''}
+        ${isOverdueSection? '<span class="overdue-badge">เลยกำหนด</span>' : ''}
+      </div>
+      ${groups[date].map(ev=>`
+        <div class="ev">
+          <span class="dot">${SOURCE_ICON_[ev.source]||'•'}</span>
+          <span>${escapeHtml_(ev.title)}${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
 function loadCalendar(){
-  apiGet('getCalendar', { days: 60, empId: EMP_ID }).then(rows=>{
+  // back=60 → ดึงงานที่เลยกำหนดแล้วแต่ยังไม่เสร็จย้อนหลังมาแสดงด้วย (ระบบซิงก์เฉพาะงานที่ยังไม่ติ๊กเสร็จอยู่แล้ว)
+  apiGet('getCalendar', { days: 60, back: 60, empId: EMP_ID }).then(rows=>{
     const box = document.getElementById('calendarList');
     if(!rows || rows.error || !rows.length){
-      box.innerHTML = '<p class="hint">ยังไม่มีงานหรือวันหยุดในช่วง 60 วันข้างหน้า</p>';
+      box.innerHTML = '<p class="hint">ยังไม่มีงานหรือวันหยุดในช่วงนี้</p>';
       return;
     }
-    // จัดกลุ่มตามวัน เพื่อให้อ่านง่ายกว่าการไล่เรียงทีละรายการ
-    const groups = {};
-    rows.forEach(r=>{ (groups[r.date] = groups[r.date] || []).push(r); });
     const today = todayISO_();
-    box.innerHTML = Object.keys(groups).sort().map(date=>`
-      <div class="day-group">
-        <div class="day-head">
-          ${thaiDateLabel_(date)} <span class="dow">(${dowLabel_(date)})</span>
-          ${date===today? '<span class="today-badge">วันนี้</span>' : ''}
-        </div>
-        ${groups[date].map(ev=>`
-          <div class="ev">
-            <span class="dot">${SOURCE_ICON_[ev.source]||'•'}</span>
-            <span>${escapeHtml_(ev.title)}${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
-          </div>`).join('')}
-      </div>`).join('');
+    const overdue = rows.filter(r=> r.overdue);
+    const upcoming = rows.filter(r=> !r.overdue);
+    let html = '';
+    if(overdue.length){
+      html += `<p class="sec-title">⚠️ งานค้าง เลยกำหนดแล้ว (${overdue.length})</p>`;
+      html += renderGroups_(overdue, today, true);
+      html += '<div style="height:10px;"></div>';
+    }
+    html += `<p class="sec-title">📌 กำลังจะถึง (${upcoming.length})</p>`;
+    html += upcoming.length ? renderGroups_(upcoming, today, false) : '<p class="hint">ไม่มีงานในช่วง 60 วันข้างหน้า</p>';
+    box.innerHTML = html;
   }).catch(()=>{
     document.getElementById('calendarList').innerHTML = '<p class="hint">โหลดปฏิทินไม่สำเร็จ ลองใหม่อีกครั้ง</p>';
   });

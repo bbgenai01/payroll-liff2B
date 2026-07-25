@@ -2,7 +2,7 @@
   หน้าปฏิทินงาน/วันหยุด สำหรับพนักงาน (LIFF แยก URL ของตัวเอง)
   อัปโหลดไฟล์นี้ขึ้น GitHub repo เดิม แล้วตั้ง Endpoint URL ของ LIFF อันใหม่เป็น
   https://bbgenai01.github.io/payroll-liff2B/calendar.html
-  ★ อย่าลืมแก้ LIFF_ID ด้านล่างให้เป็น LIFF ID ของ "ปฏิทิน" (คนละอันกับระบบลา)
+  LIFF ID ของปฏิทินใส่ไว้ให้แล้ว (2010792715-LiZuuYwV) — ใช้ Apps Script / Web App URL ตัวเดิมร่วมกับระบบลา
 -->
 <!DOCTYPE html>
 <html lang="th">
@@ -72,8 +72,8 @@
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB5G-T6mOMav2A3AIRpnf-R_o1-29FKoSxAjcwgTXr7f3_/exec';
-// ★★★ แก้ตรงนี้: ใส่ LIFF ID ของ "ปฏิทิน" (สร้างใหม่ใน LINE Developers Console คนละอันกับระบบลา) ★★★
-const LIFF_ID = '2010792715-tsR0YQFR';
+// LIFF ID ของ "ปฏิทิน" (คนละอันกับระบบลา — ระบบลาคือ 2010792715-tsR0YQFR)
+const LIFF_ID = '2010792715-LiZuuYwV';
 let EMP_ID = null, EMP_NAME = null, LINE_USER_ID = null;
 
 const DEBUG_MODE_ = new URLSearchParams(location.search).get('debug') === '1';

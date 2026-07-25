@@ -1,0 +1,207 @@
+<!--
+  หน้าปฏิทินงาน/วันหยุด สำหรับพนักงาน (LIFF แยก URL ของตัวเอง)
+  อัปโหลดไฟล์นี้ขึ้น GitHub repo เดิม แล้วตั้ง Endpoint URL ของ LIFF อันใหม่เป็น
+  https://bbgenai01.github.io/payroll-liff2B/calendar.html
+  ★ อย่าลืมแก้ LIFF_ID ด้านล่างให้เป็น LIFF ID ของ "ปฏิทิน" (คนละอันกับระบบลา)
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ปฏิทินงาน</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js" onerror="showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ (เช็คสัญญาณอินเทอร์เน็ต)')"></script>
+<style>
+  :root{ --primary:#d97706; --primary-dark:#b45309; --bg:#f3f4f6; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; }
+  *{box-sizing:border-box;}
+  body{ font-family:'Sarabun','Tahoma',sans-serif; margin:0; background:var(--bg); color:var(--text); font-size:15px; }
+  header{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; padding:16px; text-align:center; }
+  header h1{ margin:0; font-size:18px; }
+  header p{ margin:4px 0 0; font-size:12px; opacity:.9; }
+  main{ padding:14px; max-width:480px; margin:0 auto; }
+  .card{ background:#fff; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card h2{ margin:0 0 10px; font-size:16px; }
+  .hint{ font-size:12px; color:var(--muted); }
+  button.btn{ width:100%; padding:12px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  #loadingBox, #linkBox{ text-align:center; padding:40px 16px; }
+  input{ width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; }
+  .day-group{ margin-bottom:14px; }
+  .day-head{ font-weight:700; font-size:14px; color:var(--primary-dark); border-bottom:2px solid var(--border); padding-bottom:4px; margin-bottom:6px; }
+  .day-head .dow{ font-weight:400; color:var(--muted); font-size:12px; }
+  .ev{ padding:7px 0; border-bottom:1px solid var(--border); font-size:13.5px; display:flex; gap:8px; }
+  .ev:last-child{ border-bottom:none; }
+  .ev .dot{ flex:0 0 auto; }
+  .today-badge{ display:inline-block; background:#fee2e2; color:#991b1b; font-size:11px; font-weight:700; border-radius:8px; padding:1px 7px; margin-left:6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📅 ปฏิทินงาน</h1>
+  <p id="empNameTag">กำลังโหลด...</p>
+</header>
+
+<div id="loadingBox">
+  <p>กำลังเชื่อมต่อ LINE...</p>
+  <div id="connectRetryBox" style="display:none; margin-top:10px;">
+    <p class="hint" id="connectRetryMsg" style="color:var(--primary);">เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ</p>
+    <button class="btn" style="max-width:220px;margin:0 auto;" onclick="location.reload()">🔄 ลองใหม่อีกครั้ง</button>
+  </div>
+</div>
+
+<div id="linkBox" style="display:none;">
+  <div class="card" style="max-width:400px;margin:20px auto;">
+    <h2>ยืนยันตัวตนครั้งแรก</h2>
+    <p class="hint">กรอกรหัสพนักงานของคุณ (สอบถามจากแอดมิน) เพื่อผูกบัญชี LINE นี้กับข้อมูลพนักงาน</p>
+    <div style="margin:10px 0;"><input type="text" id="linkCode" placeholder="เช่น 1008"></div>
+    <button class="btn" onclick="doLink()">ยืนยัน</button>
+    <p class="hint" id="linkError" style="color:var(--primary); display:none;"></p>
+  </div>
+</div>
+
+<main id="mainApp" style="display:none;">
+  <div class="card">
+    <h2>งานและวันหยุด 60 วันข้างหน้า</h2>
+    <p class="hint">🔴 วันหยุดบริษัท &nbsp; 🟣 งานที่ครบกำหนด</p>
+  </div>
+  <div class="card">
+    <div id="calendarList"><p class="hint">กำลังโหลด...</p></div>
+  </div>
+</main>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB5G-T6mOMav2A3AIRpnf-R_o1-29FKoSxAjcwgTXr7f3_/exec';
+// ★★★ แก้ตรงนี้: ใส่ LIFF ID ของ "ปฏิทิน" (สร้างใหม่ใน LINE Developers Console คนละอันกับระบบลา) ★★★
+const LIFF_ID = '2010792715-tsR0YQFR';
+let EMP_ID = null, EMP_NAME = null, LINE_USER_ID = null;
+
+const DEBUG_MODE_ = new URLSearchParams(location.search).get('debug') === '1';
+function debugLog(msg){
+  if(!DEBUG_MODE_) return;
+  document.getElementById('loadingBox').innerHTML += '<p style="font-size:12px;color:#666;text-align:left;margin:4px 0;">'+msg+'</p>';
+}
+function showConnectRetry_(msg){
+  const box = document.getElementById('connectRetryBox');
+  if(!box) return;
+  document.getElementById('connectRetryMsg').textContent = msg || 'เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ';
+  box.style.display = 'block';
+}
+async function apiGet(action, params){
+  const qs = new URLSearchParams(Object.assign({action}, params||{})).toString();
+  const res = await fetch(`${API_URL}?${qs}`);
+  return res.json();
+}
+async function apiPost(action, payload){
+  const res = await fetch(API_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({action}, payload))
+  });
+  return res.json();
+}
+function initApp(){
+  debugLog('LIFF_ID = ' + LIFF_ID);
+  if(typeof liff === 'undefined'){
+    showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+    return;
+  }
+  let settled = false;
+  setTimeout(()=>{
+    if(!settled) showConnectRetry_('เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่');
+  }, 8000);
+  liff.init({ liffId: LIFF_ID }).then(()=>{
+    settled = true;
+    if(!liff.isLoggedIn()){ liff.login(); return Promise.reject('__redirecting__'); }
+    return liff.getProfile();
+  }).then(profile=>{
+    settled = true;
+    LINE_USER_ID = profile.userId;
+    checkLink();
+  }).catch(err=>{
+    settled = true;
+    if(err==='__redirecting__') return;
+    debugLog('❌ ' + JSON.stringify(err));
+    showConnectRetry_('เชื่อมต่อ LINE ไม่สำเร็จ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่');
+  });
+}
+function checkLink(){
+  apiGet('getProfile', { lineUserId: LINE_USER_ID }).then(r=>{
+    document.getElementById('loadingBox').style.display='none';
+    if(r.linked){
+      EMP_ID = r.empId; EMP_NAME = r.name;
+      startMainApp();
+    } else {
+      document.getElementById('linkBox').style.display='block';
+    }
+  }).catch(()=> showConnectRetry_('โหลดข้อมูลพนักงานไม่สำเร็จ ลองใหม่อีกครั้ง'));
+}
+function doLink(){
+  const code = document.getElementById('linkCode').value.trim();
+  if(!code) return;
+  apiPost('linkEmployee', { lineUserId: LINE_USER_ID, empCode: code }).then(r=>{
+    if(r.error){
+      document.getElementById('linkError').textContent = r.error;
+      document.getElementById('linkError').style.display='block';
+      return;
+    }
+    EMP_ID = r.empId; EMP_NAME = r.name;
+    document.getElementById('linkBox').style.display='none';
+    startMainApp();
+  });
+}
+function startMainApp(){
+  document.getElementById('empNameTag').textContent = EMP_NAME || '';
+  document.getElementById('mainApp').style.display='block';
+  loadCalendar();
+}
+const THAI_MONTHS_ = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const THAI_DOW_ = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+function thaiDateLabel_(dateStr){
+  const p = String(dateStr).split('-').map(Number);
+  if(!p[0] || !p[1] || !p[2]) return dateStr;
+  return `${p[2]} ${THAI_MONTHS_[p[1]]} ${p[0]+543}`;
+}
+function dowLabel_(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d) ? '' : THAI_DOW_[d.getDay()];
+}
+function todayISO_(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function escapeHtml_(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+const SOURCE_ICON_ = { holiday:'🔴', asana:'🟣', manual:'🔵' };
+function loadCalendar(){
+  apiGet('getCalendar', { days: 60, empId: EMP_ID }).then(rows=>{
+    const box = document.getElementById('calendarList');
+    if(!rows || rows.error || !rows.length){
+      box.innerHTML = '<p class="hint">ยังไม่มีงานหรือวันหยุดในช่วง 60 วันข้างหน้า</p>';
+      return;
+    }
+    // จัดกลุ่มตามวัน เพื่อให้อ่านง่ายกว่าการไล่เรียงทีละรายการ
+    const groups = {};
+    rows.forEach(r=>{ (groups[r.date] = groups[r.date] || []).push(r); });
+    const today = todayISO_();
+    box.innerHTML = Object.keys(groups).sort().map(date=>`
+      <div class="day-group">
+        <div class="day-head">
+          ${thaiDateLabel_(date)} <span class="dow">(${dowLabel_(date)})</span>
+          ${date===today? '<span class="today-badge">วันนี้</span>' : ''}
+        </div>
+        ${groups[date].map(ev=>`
+          <div class="ev">
+            <span class="dot">${SOURCE_ICON_[ev.source]||'•'}</span>
+            <span>${escapeHtml_(ev.title)}${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
+          </div>`).join('')}
+      </div>`).join('');
+  }).catch(()=>{
+    document.getElementById('calendarList').innerHTML = '<p class="hint">โหลดปฏิทินไม่สำเร็จ ลองใหม่อีกครั้ง</p>';
+  });
+}
+initApp();
+</script>
+</body>
+</html>

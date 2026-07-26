@@ -47,8 +47,10 @@
   #fileInfo.ok{ color:#166534; } #fileInfo.warn{ color:var(--amber); } #fileInfo.bad{ color:var(--red); font-weight:700; }
   /* ---- แถบความคืบหน้าตอนอัปโหลด ---- */
   #progWrap{ display:none; margin-top:12px; }
-  #progBar{ height:10px; background:var(--border); border-radius:6px; overflow:hidden; }
-  #progFill{ height:100%; width:0%; background:var(--primary); transition:width .2s; }
+  #progBar{ height:10px; background:var(--border); border-radius:6px; overflow:hidden; position:relative; }
+  #progFill{ height:100%; width:40%; background:var(--primary); border-radius:6px;
+    position:absolute; left:0; animation:slide 1.3s ease-in-out infinite; }
+  @keyframes slide{ 0%{ left:-40%; } 100%{ left:100%; } }
   #progText{ font-size:12px; color:var(--muted); margin-top:6px; text-align:center; }
   .warnbox{ background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:10px; font-size:12.5px; margin-top:10px; }
 </style>
@@ -308,10 +310,7 @@ function onPickFile(){
 function setBusy_(busy, pct, msg){
   document.getElementById('btnSubmit').disabled = busy;
   document.getElementById('progWrap').style.display = busy ? 'block':'none';
-  if(busy){
-    document.getElementById('progFill').style.width = (pct||0) + '%';
-    document.getElementById('progText').textContent = msg || 'กำลังอัปโหลด...';
-  }
+  if(busy) document.getElementById('progText').textContent = msg || 'กำลังอัปโหลด...';
 }
 
 function submitVideo(){
@@ -351,33 +350,42 @@ function submitVideo(){
   reader.readAsDataURL(PICKED_FILE);
 }
 
-function sendPayload_(payload, hasFile){
-  setBusy_(true, hasFile ? 22 : 10, hasFile ? 'กำลังอัปโหลดคลิป...' : 'กำลังส่ง...');
-  // ใช้ XHR เพราะดูความคืบหน้าการอัปโหลดได้จริง (fetch ดูไม่ได้)
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', API_URL, true);
-  xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
-  xhr.upload.onprogress = (e)=>{
-    if(e.lengthComputable){
-      const pct = 22 + Math.round(e.loaded / e.total * 70);
-      setBusy_(true, pct, 'กำลังอัปโหลดคลิป... ' + Math.round(e.loaded/e.total*100) + '%');
-    }
-  };
-  xhr.onload = ()=>{
-    setBusy_(true, 99, 'กำลังบันทึก...');
-    let r = null;
-    try{ r = JSON.parse(xhr.responseText); }catch(e){}
-    setBusy_(false);
+async function sendPayload_(payload, hasFile){
+  // หมายเหตุสำคัญ: ห้ามใช้ XMLHttpRequest พร้อมดักความคืบหน้า (xhr.upload.onprogress)
+  // เพราะการดัก upload event ทำให้เบราว์เซอร์ถือว่าไม่ใช่คำขอแบบง่าย แล้วยิง OPTIONS ไปถามก่อน
+  // ซึ่ง Apps Script ไม่ตอบ ทำให้ส่งไม่ผ่านทั้งที่อินเทอร์เน็ตปกติ
+  // จึงใช้ fetch แบบเดียวกับหน้าอื่นในระบบ และแสดงเวลาที่ผ่านไปแทนการบอกเป็น %
+  const started = Date.now();
+  let ticker = setInterval(()=>{
+    const sec = Math.round((Date.now()-started)/1000);
+    setBusy_(true, null, (hasFile ? 'กำลังอัปโหลดคลิป... ' : 'กำลังส่ง... ') + sec + ' วินาที');
+  }, 1000);
+  setBusy_(true, null, hasFile ? 'กำลังอัปโหลดคลิป...' : 'กำลังส่ง...');
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 180000);   // 3 นาที เผื่อเน็ตมือถือช้า
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+    const r = await res.json();
+    clearTimeout(timer); clearInterval(ticker); setBusy_(false);
     if(!r){ toast('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
     if(r.error){ toast(r.error); return; }
     toast('ส่งเรียบร้อย รอแอดมินตรวจสอบ');
     resetForm_();
     loadHistory();
-  };
-  xhr.onerror = ()=>{ setBusy_(false); toast('เชื่อมต่อไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); };
-  xhr.ontimeout = ()=>{ setBusy_(false); toast('หมดเวลาเชื่อมต่อ ไฟล์อาจใหญ่เกินไป ลองถ่ายคลิปให้สั้นลง'); };
-  xhr.timeout = 180000;   // 3 นาที เผื่อเน็ตมือถือช้า
-  xhr.send(JSON.stringify(payload));
+  }catch(err){
+    clearTimeout(timer); clearInterval(ticker); setBusy_(false);
+    if(err && err.name === 'AbortError'){
+      toast('หมดเวลาอัปโหลด ไฟล์อาจใหญ่เกินไป ลองถ่ายคลิปให้สั้นลงหรือใช้ช่องลิงก์แทน');
+    } else {
+      toast('ส่งไม่สำเร็จ: ' + (err && err.message ? err.message : 'ลองใหม่อีกครั้ง'));
+    }
+  }
 }
 
 function resetForm_(){

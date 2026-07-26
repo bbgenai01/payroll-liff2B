@@ -26,16 +26,41 @@
   button.btn{ width:100%; padding:12px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
   #loadingBox, #linkBox{ text-align:center; padding:40px 16px; }
   input{ width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; }
-  .day-group{ margin-bottom:14px; }
-  .day-head{ font-weight:700; font-size:14px; color:var(--primary-dark); border-bottom:2px solid var(--border); padding-bottom:4px; margin-bottom:6px; }
-  .day-head .dow{ font-weight:400; color:var(--muted); font-size:12px; }
-  .ev{ padding:7px 0; border-bottom:1px solid var(--border); font-size:13.5px; display:flex; gap:8px; }
+  /* ---- หัวเดือน + ปุ่มเลื่อนเดือน ---- */
+  .cal-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; }
+  .cal-nav .mth{ font-weight:700; font-size:16px; }
+  .cal-nav button{ border:1px solid var(--border); background:#fff; color:var(--text); width:38px; height:38px;
+    border-radius:9px; font-size:18px; cursor:pointer; font-family:inherit; flex:0 0 auto; }
+  .cal-nav button:disabled{ opacity:.3; }
+  /* ---- ตารางปฏิทิน ---- */
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal-dow{ text-align:center; font-size:11px; color:var(--muted); font-weight:700; padding:4px 0; }
+  .cal-cell{ aspect-ratio:1/1; border-radius:9px; background:#fff; border:1px solid var(--border);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding-top:5px; font-size:13px; cursor:pointer; position:relative; }
+  .cal-cell.blank{ background:transparent; border-color:transparent; cursor:default; }
+  .cal-cell.today{ border-color:var(--primary); border-width:2px; font-weight:700; }
+  .cal-cell.sel{ background:var(--primary); color:#fff; border-color:var(--primary); font-weight:700; }
+  .cal-cell.sel .dots i{ box-shadow:0 0 0 1.5px #fff; }
+  .cal-cell .dots{ display:flex; gap:2.5px; margin-top:3px; height:7px; align-items:center; }
+  .cal-cell .dots i{ width:6px; height:6px; border-radius:50%; display:block; }
+  .dot-holiday{ background:#dc2626; }
+  .dot-task{ background:#7c3aed; }
+  .dot-overdue{ background:#f59e0b; }
+  .cal-cell .more{ font-size:8px; color:var(--muted); line-height:1; }
+  .cal-cell.sel .more{ color:#fff; }
+  /* ---- กล่องรายละเอียดของวันที่เลือก ---- */
+  .day-detail-head{ font-weight:700; font-size:15px; margin-bottom:8px; }
+  .ev{ padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; display:flex; gap:9px; align-items:flex-start; }
   .ev:last-child{ border-bottom:none; }
   .ev .dot{ flex:0 0 auto; }
-  .today-badge{ display:inline-block; background:#fee2e2; color:#991b1b; font-size:11px; font-weight:700; border-radius:8px; padding:1px 7px; margin-left:6px; }
-  .overdue-badge{ display:inline-block; background:#fef3c7; color:#92400e; font-size:11px; font-weight:700; border-radius:8px; padding:1px 7px; margin-left:6px; }
-  .day-group.overdue .day-head{ color:#b45309; }
-  .sec-title{ font-size:13px; font-weight:700; color:var(--muted); margin:0 0 8px; }
+  .overdue-badge{ display:inline-block; background:#fef3c7; color:#92400e; font-size:10.5px; font-weight:700;
+    border-radius:8px; padding:1px 6px; margin-left:5px; white-space:nowrap; }
+  .legend{ display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin-top:10px; }
+  .legend span{ display:flex; align-items:center; gap:4px; }
+  .legend i{ width:8px; height:8px; border-radius:50%; display:block; }
+  .overdue-bar{ background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:9px;
+    padding:9px 11px; font-size:13px; margin-bottom:12px; cursor:pointer; font-weight:600; }
 </style>
 </head>
 <body>
@@ -65,11 +90,21 @@
 
 <main id="mainApp" style="display:none;">
   <div class="card">
-    <h2>ปฏิทินงาน/วันหยุด</h2>
-    <p class="hint">🔴 วันหยุดบริษัท (120 วันข้างหน้า) &nbsp; 🟣 งานที่ครบกำหนด (60 วันข้างหน้า) — งานค้างที่เลยกำหนดแล้วแสดงไว้บนสุด</p>
+    <div id="overdueBar" class="overdue-bar" style="display:none;" onclick="showOverdue()"></div>
+    <div class="cal-nav">
+      <button type="button" id="btnPrev" onclick="moveMonth(-1)">‹</button>
+      <div class="mth" id="calMonthLabel">—</div>
+      <button type="button" id="btnNext" onclick="moveMonth(1)">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"><p class="hint">กำลังโหลด...</p></div>
+    <div class="legend">
+      <span><i class="dot-holiday"></i> วันหยุด</span>
+      <span><i class="dot-task"></i> งานครบกำหนด</span>
+      <span><i class="dot-overdue"></i> งานค้าง</span>
+    </div>
   </div>
   <div class="card">
-    <div id="calendarList"><p class="hint">กำลังโหลด...</p></div>
+    <div id="dayDetail"><p class="hint">แตะวันที่ในปฏิทินเพื่อดูรายละเอียด</p></div>
   </div>
 </main>
 
@@ -187,53 +222,145 @@ function addDaysISO_(iso, days){
 function escapeHtml_(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-const SOURCE_ICON_ = { holiday:'🔴', asana:'🟣', manual:'🔵' };
-function renderGroups_(rows, today, isOverdueSection){
-  const groups = {};
-  rows.forEach(r=>{ (groups[r.date] = groups[r.date] || []).push(r); });
-  return Object.keys(groups).sort().map(date=>`
-    <div class="day-group${isOverdueSection? ' overdue':''}">
-      <div class="day-head">
-        ${thaiDateLabel_(date)} <span class="dow">(${dowLabel_(date)})</span>
-        ${date===today? '<span class="today-badge">วันนี้</span>' : ''}
-        ${isOverdueSection? '<span class="overdue-badge">เลยกำหนด</span>' : ''}
-      </div>
-      ${groups[date].map(ev=>`
-        <div class="ev">
-          <span class="dot">${SOURCE_ICON_[ev.source]||'•'}</span>
-          <span>${escapeHtml_(ev.title)}${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
-        </div>`).join('')}
-    </div>`).join('');
-}
+const THAI_MONTHS_FULL_ = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const THAI_DOW_SHORT_ = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const SOURCE_ICON_ = { holiday:'🔴', asana:'🟣', teamtask:'🟣', manual:'🔵' };
+
+// สถานะของหน้าปฏิทิน
+let EVENTS_BY_DATE = {};   // { 'YYYY-MM-DD': [event, ...] }
+let VIEW_Y = 0, VIEW_M = 0;   // เดือนที่กำลังดูอยู่ (M = 1-12)
+let MIN_YM = '', MAX_YM = '';  // ขอบเขตเดือนที่มีข้อมูล กันเลื่อนไปเรื่อยๆ จนเจอแต่หน้าว่าง
+let SELECTED_DATE = '';
+
+function ymKey_(y, m){ return y + '-' + String(m).padStart(2,'0'); }
+
 function loadCalendar(){
-  // back=60 → ดึงงานที่เลยกำหนดแล้วแต่ยังไม่เสร็จย้อนหลังมาแสดงด้วย (ระบบซิงก์เฉพาะงานที่ยังไม่ติ๊กเสร็จอยู่แล้ว)
   apiGet('getCalendar', { days: HOLIDAY_AHEAD_DAYS, back: BACK_DAYS, empId: EMP_ID }).then(all=>{
-    const box = document.getElementById('calendarList');
     // ขอข้อมูลมาช่วงยาวสุด (เท่าวันหยุด) แล้วค่อยตัดงานที่ไกลเกิน TASK_AHEAD_DAYS ออกตรงนี้
     // วันหยุดจึงมองไกลได้ 120 วัน ส่วนงานเห็นแค่ 60 วัน
     const taskCutoff = addDaysISO_(todayISO_(), TASK_AHEAD_DAYS);
     const rows = (all && all.length && !all.error)
       ? all.filter(r=> r.source === 'holiday' ? true : r.date <= taskCutoff)
       : [];
-    if(!rows.length){
-      box.innerHTML = '<p class="hint">ยังไม่มีงานหรือวันหยุดในช่วงนี้</p>';
-      return;
-    }
+
+    EVENTS_BY_DATE = {};
+    rows.forEach(r=>{ (EVENTS_BY_DATE[r.date] = EVENTS_BY_DATE[r.date] || []).push(r); });
+
     const today = todayISO_();
-    const overdue = rows.filter(r=> r.overdue);
-    const upcoming = rows.filter(r=> !r.overdue);
-    let html = '';
-    if(overdue.length){
-      html += `<p class="sec-title">⚠️ งานค้าง เลยกำหนดแล้ว (${overdue.length})</p>`;
-      html += renderGroups_(overdue, today, true);
-      html += '<div style="height:10px;"></div>';
-    }
-    html += `<p class="sec-title">📌 กำลังจะถึง (${upcoming.length})</p>`;
-    html += upcoming.length ? renderGroups_(upcoming, today, false) : '<p class="hint">ไม่มีรายการในช่วง 120 วันข้างหน้า</p>';
-    box.innerHTML = html;
+    const dates = Object.keys(EVENTS_BY_DATE).sort();
+    // ให้เลื่อนดูได้ตั้งแต่เดือนของข้อมูลแรกสุด ถึงเดือนของข้อมูลท้ายสุด (อย่างน้อยต้องครอบเดือนปัจจุบัน)
+    MIN_YM = dates.length ? dates[0].slice(0,7) : today.slice(0,7);
+    MAX_YM = dates.length ? dates[dates.length-1].slice(0,7) : today.slice(0,7);
+    if(MIN_YM > today.slice(0,7)) MIN_YM = today.slice(0,7);
+    if(MAX_YM < today.slice(0,7)) MAX_YM = today.slice(0,7);
+
+    const tp = today.split('-').map(Number);
+    VIEW_Y = tp[0]; VIEW_M = tp[1];
+    SELECTED_DATE = today;
+
+    renderOverdueBar_(rows);
+    renderMonth_();
+    renderDayDetail_(today);
   }).catch(()=>{
-    document.getElementById('calendarList').innerHTML = '<p class="hint">โหลดปฏิทินไม่สำเร็จ ลองใหม่อีกครั้ง</p>';
+    document.getElementById('calGrid').innerHTML = '<p class="hint">โหลดปฏิทินไม่สำเร็จ ลองใหม่อีกครั้ง</p>';
   });
+}
+
+function renderOverdueBar_(rows){
+  const bar = document.getElementById('overdueBar');
+  const n = rows.filter(r=> r.overdue && r.source !== 'holiday').length;
+  if(!n){ bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+  bar.textContent = '⚠️ มีงานค้างเลยกำหนดแล้ว ' + n + ' รายการ — แตะเพื่อดู';
+}
+function showOverdue(){
+  const list = [];
+  Object.keys(EVENTS_BY_DATE).sort().forEach(d=>{
+    EVENTS_BY_DATE[d].forEach(ev=>{ if(ev.overdue && ev.source !== 'holiday') list.push(ev); });
+  });
+  SELECTED_DATE = '';
+  renderMonth_();
+  const box = document.getElementById('dayDetail');
+  box.innerHTML = '<div class="day-detail-head">⚠️ งานค้างทั้งหมด (' + list.length + ')</div>'
+    + list.map(ev=>`
+      <div class="ev">
+        <span class="dot"><i style="display:block;width:8px;height:8px;border-radius:50%;margin-top:5px;" class="dot-overdue"></i></span>
+        <span>${escapeHtml_(ev.title)}
+          <span class="overdue-badge">${thaiDateLabel_(ev.date)}</span>
+          ${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
+      </div>`).join('');
+  box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function moveMonth(step){
+  let y = VIEW_Y, m = VIEW_M + step;
+  if(m < 1){ m = 12; y--; }
+  if(m > 12){ m = 1; y++; }
+  const key = ymKey_(y, m);
+  if(key < MIN_YM || key > MAX_YM) return;
+  VIEW_Y = y; VIEW_M = m;
+  renderMonth_();
+}
+
+function dotClassFor_(ev){
+  if(ev.source === 'holiday') return 'dot-holiday';
+  return ev.overdue ? 'dot-overdue' : 'dot-task';
+}
+
+function renderMonth_(){
+  document.getElementById('calMonthLabel').textContent = THAI_MONTHS_FULL_[VIEW_M] + ' ' + (VIEW_Y + 543);
+  const cur = ymKey_(VIEW_Y, VIEW_M);
+  document.getElementById('btnPrev').disabled = (cur <= MIN_YM);
+  document.getElementById('btnNext').disabled = (cur >= MAX_YM);
+
+  const today = todayISO_();
+  const firstDow = new Date(VIEW_Y, VIEW_M-1, 1).getDay();      // 0 = อาทิตย์
+  const daysInMonth = new Date(VIEW_Y, VIEW_M, 0).getDate();
+
+  let html = THAI_DOW_SHORT_.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0; i<firstDow; i++) html += '<div class="cal-cell blank"></div>';
+
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = `${VIEW_Y}-${String(VIEW_M).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs = EVENTS_BY_DATE[iso] || [];
+    // แสดงจุดสีไม่เกิน 3 จุด ถ้าเกินใส่ + ต่อท้าย เพื่อไม่ให้ช่องแน่นเกินไปบนมือถือ
+    const dots = evs.slice(0,3).map(ev=>`<i class="${dotClassFor_(ev)}"></i>`).join('');
+    const more = evs.length > 3 ? `<div class="more">+${evs.length-3}</div>` : '';
+    const cls = 'cal-cell'
+      + (iso === today ? ' today' : '')
+      + (iso === SELECTED_DATE ? ' sel' : '');
+    html += `<div class="${cls}" onclick="selectDay('${iso}')">
+      <div>${d}</div><div class="dots">${dots}</div>${more}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function selectDay(iso){
+  SELECTED_DATE = iso;
+  renderMonth_();
+  renderDayDetail_(iso);
+}
+
+function renderDayDetail_(iso){
+  const box = document.getElementById('dayDetail');
+  const evs = EVENTS_BY_DATE[iso] || [];
+  const isToday = iso === todayISO_();
+  let html = '<div class="day-detail-head">'
+    + thaiDateLabel_(iso) + ' (' + dowLabel_(iso) + ')'
+    + (isToday ? ' <span class="overdue-badge" style="background:#fee2e2;color:#991b1b;">วันนี้</span>' : '')
+    + '</div>';
+  if(!evs.length){
+    html += '<p class="hint">ไม่มีวันหยุดหรืองานในวันนี้</p>';
+  } else {
+    html += evs.map(ev=>`
+      <div class="ev">
+        <span class="dot">${SOURCE_ICON_[ev.source]||'•'}</span>
+        <span>${escapeHtml_(ev.title)}
+          ${ev.overdue && ev.source!=='holiday' ? '<span class="overdue-badge">เลยกำหนด</span>' : ''}
+          ${ev.detail? '<br><span class="hint">'+escapeHtml_(ev.detail)+'</span>' : ''}</span>
+      </div>`).join('');
+  }
+  box.innerHTML = html;
 }
 initApp();
 </script>

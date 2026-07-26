@@ -2,7 +2,7 @@
   หน้าส่งคลิปวิดีโอ สำหรับพนักงาน (LIFF แยก URL ของตัวเอง)
   อัปโหลดไฟล์นี้ขึ้น GitHub repo เดิม แล้วตั้ง Endpoint URL ของ LIFF อันใหม่เป็น
   https://bbgenai01.github.io/payroll-liff2B/video.html
-  ★ อย่าลืมแก้ LIFF_ID ด้านล่างให้เป็น LIFF ID ของ "ส่งวิดีโอ" (คนละอันกับระบบลาและปฏิทิน)
+  LIFF ID ของหน้าส่งวิดีโอใส่ไว้ให้แล้ว (2010792715-NJkPYkAS)
   ใช้ Apps Script / Web App URL ตัวเดิมร่วมกับระบบอื่น
 -->
 <!DOCTYPE html>
@@ -171,8 +171,8 @@
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB5G-T6mOMav2A3AIRpnf-R_o1-29FKoSxAjcwgTXr7f3_/exec';
-// ★★★ แก้ตรงนี้: ใส่ LIFF ID ของ "ส่งวิดีโอ" (สร้างใหม่ใน LINE Developers Console) ★★★
-const LIFF_ID = 'ใส่-LIFF-ID-ของหน้าส่งวิดีโอตรงนี้';
+// LIFF ID ของหน้า "ส่งวิดีโอ" (ระบบลา = 2010792715-tsR0YQFR, ปฏิทิน = 2010792715-LiZuuYwV)
+const LIFF_ID = '2010792715-NJkPYkAS';
 
 // เพดานขนาดไฟล์ — ข้อมูลต้องแปลงเป็นข้อความก่อนส่ง ทำให้ขนาดพองขึ้นราว 33%
 // จึงตั้งเพดานจริงไว้ต่ำกว่าขีดจำกัดของ Apps Script เพื่อความชัวร์

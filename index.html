@@ -418,7 +418,7 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
     <div class="slip-section-title">รายการหัก</div>
     <table class="slip-table">
       <tr><td>ลาไม่รับค่าจ้าง (${d.leaveUnpaidDays||0} วัน)</td><td>-${moneyTH_(d.unpaidDeduction)}</td></tr>
-      <tr><td>ประกันสังคม${d.noSS? ' (ยกเว้น)':''}</td><td>-${moneyTH_(d.ssDeduction)}</td></tr>
+      <tr><td>ประกันสังคม${d.noSS? ' (ยกเว้น)' : (d.ssBaseAmount!==undefined? ' ('+d.ssRate+'% ของ '+moneyTH_(d.ssBaseAmount)+')' : '')}</td><td>-${moneyTH_(d.ssDeduction)}</td></tr>
       ${d.whtEnabled ? '<tr><td>หัก ณ ที่จ่าย'+(d.wht3? ' (3%)':'')+'</td><td>-'+moneyTH_(d.whtDeduction)+'</td></tr>' : ''}
       <tr class="slip-total-row"><td>เงินเดือนสุทธิ</td><td>${moneyTH_(netPay)} บาท</td></tr>
     </table>

@@ -50,6 +50,21 @@
   .slip-section-title{ font-weight:700; color:var(--primary-dark); margin:14px 0 4px; font-size:13px; }
   .slip-total-row td{ font-weight:700; font-size:16px; border-top:2px solid var(--text); padding-top:8px; }
   .no-print{ /* kept for layout compatibility */ }
+  /* ---- กล่องยืนยันของเราเอง (ไม่ใช้ของเบราว์เซอร์ จะได้ไม่โชว์ชื่อเว็บ) ---- */
+  #confirmOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300;
+    align-items:center; justify-content:center; padding:20px; }
+  #confirmOverlay.show{ display:flex; }
+  #confirmCard{ background:#fff; border-radius:14px; padding:20px; max-width:340px; width:100%; }
+  #confirmCard h3{ margin:0 0 12px; font-size:17px; text-align:center; color:var(--primary-dark); }
+  #confirmBody{ font-size:14px; line-height:1.7; margin-bottom:8px; }
+  #confirmBody .row2{ display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px solid var(--border); }
+  #confirmBody .row2 span:first-child{ color:var(--muted); flex:0 0 auto; }
+  #confirmBody .row2 span:last-child{ text-align:right; font-weight:600; }
+  #confirmNote{ font-size:12px; color:var(--muted); text-align:center; margin:12px 0 16px; }
+  #confirmBtns{ display:flex; gap:10px; }
+  #confirmBtns button{ flex:1; padding:12px; border:none; border-radius:9px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; }
+  #btnConfirmNo{ background:#e5e7eb; color:var(--text); }
+  #btnConfirmYes{ background:var(--primary); color:#fff; }
 </style>
 </head>
 <body>
@@ -147,6 +162,18 @@
   <button onclick="showView('history', this)">🗂️ ประวัติ</button>
   <button onclick="showView('payslip', this)">💰 เงินเดือน</button>
 </nav>
+
+<div id="confirmOverlay">
+  <div id="confirmCard">
+    <h3>ยืนยันส่งคำขอลา</h3>
+    <div id="confirmBody"></div>
+    <p id="confirmNote">เมื่อส่งแล้วจะมีข้อความยืนยันกลับมาที่แชทไลน์</p>
+    <div id="confirmBtns">
+      <button id="btnConfirmNo" onclick="closeConfirm_(false)">ยกเลิก</button>
+      <button id="btnConfirmYes" onclick="closeConfirm_(true)">ยืนยันส่ง</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -282,7 +309,22 @@ function thaiDateFull_(iso){
   if(!p[0]||!p[1]||!p[2]) return iso;
   return `${p[2]} ${THAI_MONTHS_[p[1]]} ${p[0]+543}`;
 }
-function submitLeave(e){
+function escapeHtml_(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// กล่องยืนยันของเราเอง — ใช้แทน confirm() ของเบราว์เซอร์ที่บังคับโชว์ชื่อเว็บ
+let _confirmResolve = null;
+function askConfirm_(rows){
+  document.getElementById('confirmBody').innerHTML = rows
+    .map(r=>`<div class="row2"><span>${r[0]}</span><span>${escapeHtml_(r[1])}</span></div>`).join('');
+  document.getElementById('confirmOverlay').classList.add('show');
+  return new Promise(resolve=>{ _confirmResolve = resolve; });
+}
+function closeConfirm_(ok){
+  document.getElementById('confirmOverlay').classList.remove('show');
+  if(_confirmResolve){ _confirmResolve(ok); _confirmResolve = null; }
+}
+async function submitLeave(e){
   e.preventDefault();
   const date = document.getElementById('lfDate').value;
   const leaveType = document.getElementById('lfType').value;
@@ -292,14 +334,14 @@ function submitLeave(e){
   const file = fileInput.files[0];
 
   // ยืนยันก่อนส่ง — สรุปให้อ่านอีกรอบ กันกดผิดวันหรือผิดประเภท
-  const summary = 'ยืนยันส่งคำขอลา?\n\n'
-    + '• ประเภท: ' + (LEAVE_TYPE_LABEL[leaveType]||leaveType) + '\n'
-    + '• วันที่: ' + thaiDateFull_(date) + '\n'
-    + '• จำนวน: ' + leaveDays + ' วัน'
-    + (reason ? '\n• เหตุผล: ' + reason : '')
-    + (file ? '\n• แนบรูป: ' + file.name : '')
-    + '\n\nเมื่อส่งแล้วจะมีข้อความยืนยันกลับมาที่แชทไลน์';
-  if(!confirm(summary)) return;
+  const rows = [
+    ['ประเภท', LEAVE_TYPE_LABEL[leaveType]||leaveType],
+    ['วันที่', thaiDateFull_(date)],
+    ['จำนวน', leaveDays + ' วัน']
+  ];
+  if(reason) rows.push(['เหตุผล', reason]);
+  if(file) rows.push(['แนบรูป', file.name]);
+  if(!await askConfirm_(rows)) return;
 
   const send = (evidenceBase64)=>{
     apiPost('submitLeave', {

@@ -10,6 +10,11 @@
 <base target="_top">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<!-- บอกเบราว์เซอร์ในแอป LINE ไม่ให้เก็บไฟล์เก่าไว้ ทุกครั้งที่เปิดจะโหลดตัวใหม่เสมอ
+     (ถ้าไม่มีบรรทัดนี้ พนักงานอาจเห็นหน้าเวอร์ชันเก่าไปอีกหลายชั่วโมงหลังอัปเดต) -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>ระบบลาออนไลน์</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" onerror="showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ (เช็คสัญญาณอินเทอร์เน็ต)')"></script>
 <style>

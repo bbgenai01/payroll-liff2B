@@ -277,6 +277,11 @@ function toggleEvidence(){
   const type = document.getElementById('lfType').value;
   document.getElementById('evidenceField').style.display = type==='sick' ? 'block':'none';
 }
+function thaiDateFull_(iso){
+  const p = String(iso).split('-').map(Number);
+  if(!p[0]||!p[1]||!p[2]) return iso;
+  return `${p[2]} ${THAI_MONTHS_[p[1]]} ${p[0]+543}`;
+}
 function submitLeave(e){
   e.preventDefault();
   const date = document.getElementById('lfDate').value;
@@ -285,13 +290,24 @@ function submitLeave(e){
   const reason = document.getElementById('lfReason').value.trim();
   const fileInput = document.getElementById('lfEvidence');
   const file = fileInput.files[0];
+
+  // ยืนยันก่อนส่ง — สรุปให้อ่านอีกรอบ กันกดผิดวันหรือผิดประเภท
+  const summary = 'ยืนยันส่งคำขอลา?\n\n'
+    + '• ประเภท: ' + (LEAVE_TYPE_LABEL[leaveType]||leaveType) + '\n'
+    + '• วันที่: ' + thaiDateFull_(date) + '\n'
+    + '• จำนวน: ' + leaveDays + ' วัน'
+    + (reason ? '\n• เหตุผล: ' + reason : '')
+    + (file ? '\n• แนบรูป: ' + file.name : '')
+    + '\n\nเมื่อส่งแล้วจะมีข้อความยืนยันกลับมาที่แชทไลน์';
+  if(!confirm(summary)) return;
+
   const send = (evidenceBase64)=>{
     apiPost('submitLeave', {
       empId: EMP_ID, empName: EMP_NAME, date, leaveType, leaveDays, reason,
       evidenceBase64: evidenceBase64||'', evidenceFileName: file? file.name : '', source:'line'
     }).then(r=>{
       if(r.error){ toast(r.error); return; }
-      toast('ส่งคำขอลาแล้ว รอแอดมินอนุมัติ');
+      toast('ส่งคำขอลาแล้ว — ดูข้อความยืนยันได้ที่แชทไลน์ของร้าน');
       document.getElementById('leaveForm').reset();
       document.getElementById('lfDate').value = todayISO();
       toggleEvidence();

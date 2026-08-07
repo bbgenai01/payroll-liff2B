@@ -379,9 +379,13 @@ async function sendPayload_(payload, hasFile){
     clearTimeout(timer); clearInterval(ticker); setBusy_(false);
     if(!r){ toast('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
     if(r.error){ toast(r.error); return; }
-    toast('ส่งเรียบร้อย รอแอดมินตรวจสอบ');
+    toast('✅ ส่งเรียบร้อย รอแอดมินตรวจสอบ');
     resetForm_();
     loadHistory();
+    // ปิดหน้าเองแล้วพากลับเข้าแชท เหมือนหน้าระบบลา กันหน้าค้างโดยไม่มีทางออก
+    setTimeout(()=>{
+      try{ if(liff.isInClient()) liff.closeWindow(); }catch(e){}
+    }, 1500);
   }catch(err){
     clearTimeout(timer); clearInterval(ticker); setBusy_(false);
     if(err && err.name === 'AbortError'){

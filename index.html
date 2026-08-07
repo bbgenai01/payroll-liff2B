@@ -354,11 +354,16 @@ async function submitLeave(e){
       evidenceBase64: evidenceBase64||'', evidenceFileName: file? file.name : '', source:'line'
     }).then(r=>{
       if(r.error){ toast(r.error); return; }
-      toast('ส่งคำขอลาแล้ว — ดูข้อความยืนยันได้ที่แชทไลน์ของร้าน');
+      toast('✅ ส่งคำขอลาแล้ว กำลังกลับไปหน้าแชท...');
       document.getElementById('leaveForm').reset();
       document.getElementById('lfDate').value = todayISO();
       toggleEvidence();
       loadBalance();
+      // ปิดหน้านี้เองแล้วพากลับเข้าแชท — พนักงานจะเห็นข้อความยืนยันทันที
+      // (ถ้าไม่ปิด LINE จะไม่เด้งแจ้งเตือนขณะหน้าเว็บเปิดค้างอยู่ และไม่มีทางออกนอกจากกดกากบาท)
+      setTimeout(()=>{
+        try{ if(liff.isInClient()) liff.closeWindow(); }catch(e){}
+      }, 1200);
     });
   };
   if(file){

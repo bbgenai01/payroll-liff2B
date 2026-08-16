@@ -1,0 +1,272 @@
+<!--
+  หน้าอนุมัติวันลาบนมือถือ (สำหรับหัวหน้า/เจ้าของเท่านั้น)
+  อัปโหลดขึ้น GitHub repo เดิม แล้วตั้ง Endpoint URL ของ LIFF อันใหม่เป็น
+  https://liff.2btohomeplus.com/admin.html
+  LIFF ID ของหน้านี้ใส่ไว้ให้แล้ว (2010792715-pdxCqzZS)
+  รายชื่อคนที่มีสิทธิ์อนุมัติกำหนดใน Code.gs ที่ตัวแปร LEAVE_APPROVERS
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- ตั้งเป็นแอปบนหน้าจอโฮมได้ (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e40af">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="อนุมัติวันลา">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>อนุมัติวันลา</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js" onerror="showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ (เช็คสัญญาณอินเทอร์เน็ต)')"></script>
+<style>
+  :root{ --primary:#1e40af; --primary-dark:#1e3a8a; --bg:#f3f4f6; --text:#1f2937; --muted:#6b7280;
+         --border:#e5e7eb; --green:#16a34a; --red:#dc2626; --amber:#d97706; }
+  *{box-sizing:border-box;}
+  body{ font-family:'Sarabun','Tahoma',sans-serif; margin:0; background:var(--bg); color:var(--text); font-size:15px; padding-bottom:24px; }
+  header{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; padding:16px; text-align:center; }
+  header h1{ margin:0; font-size:18px; }
+  header p{ margin:4px 0 0; font-size:12px; opacity:.9; }
+  main{ padding:14px; max-width:480px; margin:0 auto; }
+  .card{ background:#fff; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card h2{ margin:0 0 10px; font-size:16px; }
+  .hint{ font-size:12px; color:var(--muted); }
+  button.btn{ width:100%; padding:12px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+  #loadingBox, #linkBox, #denyBox{ text-align:center; padding:40px 16px; }
+  input{ width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; }
+  #toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111827; color:#fff;
+    padding:10px 18px; border-radius:8px; font-size:13px; display:none; z-index:99; max-width:90%; text-align:center; }
+  /* ---- การ์ดคำขอลา ---- */
+  .req{ border:1px solid var(--border); border-radius:10px; padding:13px; margin-bottom:11px; }
+  .req .who{ font-weight:700; font-size:15px; }
+  .req .meta{ font-size:13px; color:var(--muted); margin-top:5px; line-height:1.6; }
+  .req .meta b{ color:var(--text); }
+  .req .acts{ display:flex; gap:9px; margin-top:11px; }
+  .req .acts button{ flex:1; padding:11px; border:none; border-radius:8px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; }
+  .bt-ok{ background:var(--green); color:#fff; }
+  .bt-no{ background:#fee2e2; color:var(--red); }
+  .req .acts button:disabled{ opacity:.5; }
+  .evi{ display:inline-block; margin-top:6px; font-size:12.5px; color:var(--primary); }
+  .badge{ display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:700; }
+  .badge.approved{ background:#dcfce7; color:#166534; }
+  .badge.rejected{ background:#fee2e2; color:#991b1b; }
+  .hist{ padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .hist:last-child{ border-bottom:none; }
+  .count-pill{ display:inline-block; background:var(--amber); color:#fff; border-radius:11px; padding:1px 9px; font-size:13px; font-weight:700; margin-left:6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✅ อนุมัติวันลา</h1>
+  <p id="empNameTag">กำลังโหลด...</p>
+</header>
+
+<div id="loadingBox">
+  <p>กำลังเชื่อมต่อ LINE...</p>
+  <div id="connectRetryBox" style="display:none; margin-top:10px;">
+    <p class="hint" id="connectRetryMsg" style="color:var(--primary);">เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ</p>
+    <button class="btn" style="max-width:220px;margin:0 auto;" onclick="location.reload()">🔄 ลองใหม่อีกครั้ง</button>
+  </div>
+</div>
+
+<div id="linkBox" style="display:none;">
+  <div class="card" style="max-width:400px;margin:20px auto;">
+    <h2>ยืนยันตัวตนครั้งแรก</h2>
+    <p class="hint">กรอกรหัสพนักงานของคุณเพื่อผูกบัญชี LINE นี้กับข้อมูลพนักงาน</p>
+    <div style="margin:10px 0;"><input type="text" id="linkCode" placeholder="เช่น 1008"></div>
+    <button class="btn" onclick="doLink()">ยืนยัน</button>
+    <p class="hint" id="linkError" style="color:var(--red); display:none;"></p>
+  </div>
+</div>
+
+<div id="denyBox" style="display:none;">
+  <div class="card" style="max-width:400px;margin:20px auto;">
+    <h2>🔒 ไม่มีสิทธิ์เข้าถึง</h2>
+    <p class="hint" id="denyMsg">หน้านี้สำหรับผู้มีสิทธิ์อนุมัติวันลาเท่านั้น<br>หากคิดว่าผิดพลาด ติดต่อผู้ดูแลระบบ</p>
+  </div>
+</div>
+
+<main id="mainApp" style="display:none;">
+  <div class="card">
+    <h2>รอการอนุมัติ<span id="pendCount" class="count-pill" style="display:none;">0</span></h2>
+    <div id="pendingList"><p class="hint">กำลังโหลด...</p></div>
+  </div>
+  <div class="card">
+    <h2>ดำเนินการล่าสุด</h2>
+    <div id="recentList"><p class="hint">กำลังโหลด...</p></div>
+  </div>
+  <button class="btn" style="background:#e5e7eb;color:var(--text);" onclick="loadList()">🔄 รีเฟรช</button>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbw8Fbc2o-ljzKKC4SxU1BLB5G-T6mOMav2A3AIRpnf-R_o1-29FKoSxAjcwgTXr7f3_/exec';
+// LIFF ID ของหน้า "อนุมัติวันลา"
+// (ระบบลา = 2010792715-tsR0YQFR, ปฏิทิน = 2010792715-LiZuuYwV, ส่งวิดีโอ = 2010792715-NJkPYkAS)
+const LIFF_ID = '2010792715-pdxCqzZS';
+
+let EMP_ID = null, EMP_NAME = null, LINE_USER_ID = null;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display='block';
+  clearTimeout(window._t); window._t = setTimeout(()=>{ t.style.display='none'; }, 3000);
+}
+function escapeHtml_(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showConnectRetry_(msg){
+  const box = document.getElementById('connectRetryBox');
+  if(!box) return;
+  document.getElementById('connectRetryMsg').textContent = msg || 'เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ';
+  box.style.display = 'block';
+}
+async function apiGet(action, params){
+  const qs = new URLSearchParams(Object.assign({action}, params||{})).toString();
+  const res = await fetch(`${API_URL}?${qs}`);
+  return res.json();
+}
+async function apiPost(action, payload){
+  const res = await fetch(API_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({action}, payload))
+  });
+  return res.json();
+}
+
+function initApp(){
+  if(typeof liff === 'undefined'){
+    showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+    return;
+  }
+  let settled = false;
+  setTimeout(()=>{ if(!settled) showConnectRetry_('เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่'); }, 8000);
+  liff.init({ liffId: LIFF_ID }).then(()=>{
+    settled = true;
+    if(!liff.isLoggedIn()){ liff.login(); return Promise.reject('__redirecting__'); }
+    return liff.getProfile();
+  }).then(profile=>{
+    settled = true;
+    LINE_USER_ID = profile.userId;
+    checkLink();
+  }).catch(err=>{
+    settled = true;
+    if(err==='__redirecting__') return;
+    showConnectRetry_('เชื่อมต่อ LINE ไม่สำเร็จ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่');
+  });
+}
+function checkLink(){
+  apiGet('getProfile', { lineUserId: LINE_USER_ID }).then(r=>{
+    document.getElementById('loadingBox').style.display='none';
+    if(r.linked){
+      EMP_ID = r.empId; EMP_NAME = r.name;
+      document.getElementById('empNameTag').textContent = EMP_NAME || '';
+      loadList();
+    } else {
+      document.getElementById('linkBox').style.display='block';
+    }
+  }).catch(()=> showConnectRetry_('โหลดข้อมูลพนักงานไม่สำเร็จ ลองใหม่อีกครั้ง'));
+}
+function doLink(){
+  const code = document.getElementById('linkCode').value.trim();
+  if(!code) return;
+  apiPost('linkEmployee', { lineUserId: LINE_USER_ID, empCode: code }).then(r=>{
+    if(r.error){
+      document.getElementById('linkError').textContent = r.error;
+      document.getElementById('linkError').style.display='block';
+      return;
+    }
+    EMP_ID = r.empId; EMP_NAME = r.name;
+    document.getElementById('empNameTag').textContent = EMP_NAME || '';
+    document.getElementById('linkBox').style.display='none';
+    loadList();
+  });
+}
+
+const THAI_MONTHS_ = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const THAI_DOW_ = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+function thaiDate_(iso){
+  const p = String(iso).split('-').map(Number);
+  if(!p[0]||!p[1]||!p[2]) return iso;
+  const d = new Date(p[0], p[1]-1, p[2]);
+  const dow = isNaN(d) ? '' : ' (' + THAI_DOW_[d.getDay()] + ')';
+  return `${p[2]} ${THAI_MONTHS_[p[1]]} ${p[0]+543}${dow}`;
+}
+
+function loadList(){
+  const box = document.getElementById('pendingList');
+  box.innerHTML = '<p class="hint">กำลังโหลด...</p>';
+  apiGet('getApprovalList', { empId: EMP_ID }).then(r=>{
+    if(r && r.denied){
+      document.getElementById('mainApp').style.display = 'none';
+      document.getElementById('denyBox').style.display = 'block';
+      document.getElementById('denyMsg').innerHTML =
+        'บัญชีของ <b>' + escapeHtml_(EMP_NAME||'') + '</b> ไม่มีสิทธิ์อนุมัติวันลา<br>'
+        + '<span class="hint">หากต้องการสิทธิ์ ให้เพิ่มชื่อใน LEAVE_APPROVERS ของสคริปต์</span>';
+      return;
+    }
+    if(!r || !r.ok){ box.innerHTML = '<p class="hint">โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชอีกครั้ง</p>'; return; }
+    document.getElementById('mainApp').style.display = 'block';
+
+    const pend = r.pending || [];
+    const pill = document.getElementById('pendCount');
+    if(pend.length){ pill.textContent = pend.length; pill.style.display = 'inline-block'; }
+    else { pill.style.display = 'none'; }
+
+    box.innerHTML = pend.length ? pend.map(x=>`
+      <div class="req" id="req-${x.requestId}">
+        <div class="who">${escapeHtml_(x.empName||x.empId)}</div>
+        <div class="meta">
+          <b>${escapeHtml_(x.leaveTypeTh)}</b> · ${x.leaveDays} วัน<br>
+          ${thaiDate_(x.date)}
+          ${x.reason ? '<br>เหตุผล: ' + escapeHtml_(x.reason) : ''}
+        </div>
+        ${x.evidenceUrl ? '<a class="evi" href="'+x.evidenceUrl+'" target="_blank">📷 ดูรูปที่แนบมา</a>' : ''}
+        <div class="acts">
+          <button class="bt-no" onclick="decide('${x.requestId}','rejected')">ไม่อนุมัติ</button>
+          <button class="bt-ok" onclick="decide('${x.requestId}','approved')">อนุมัติ</button>
+        </div>
+      </div>`).join('')
+      : '<p class="hint">ไม่มีคำขอลารออนุมัติ 🎉</p>';
+
+    const rec = r.recent || [];
+    document.getElementById('recentList').innerHTML = rec.length ? rec.map(x=>`
+      <div class="hist">
+        ${escapeHtml_(x.empName||x.empId)} — ${escapeHtml_(x.leaveTypeTh)} ${x.leaveDays} วัน
+        <span class="badge ${x.status}">${x.status==='approved'?'อนุมัติ':'ไม่อนุมัติ'}</span>
+        <br><span class="hint">${thaiDate_(x.date)}</span>
+      </div>`).join('') : '<p class="hint">ยังไม่มีรายการ</p>';
+  }).catch(()=>{
+    box.innerHTML = '<p class="hint">โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชอีกครั้ง</p>';
+  });
+}
+
+function decide(requestId, status){
+  const card = document.getElementById('req-' + requestId);
+  const label = status==='approved' ? 'อนุมัติ' : 'ไม่อนุมัติ';
+  if(!confirm('ยืนยัน' + label + 'คำขอลานี้?')) return;
+  if(card) card.querySelectorAll('button').forEach(b=>b.disabled = true);
+  apiPost('approveLeaveByAdmin', { requestId, status, byEmpId: EMP_ID }).then(r=>{
+    if(!r || r.error){
+      toast((r && r.error) || 'ทำรายการไม่สำเร็จ');
+      if(card) card.querySelectorAll('button').forEach(b=>b.disabled = false);
+      return;
+    }
+    toast('✅ ' + label + 'แล้ว — ระบบแจ้งพนักงานทางไลน์ให้อัตโนมัติ');
+    loadList();
+  }).catch(()=>{
+    toast('เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง');
+    if(card) card.querySelectorAll('button').forEach(b=>b.disabled = false);
+  });
+}
+initApp();
+</script>
+</body>
+</html>

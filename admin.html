@@ -14,13 +14,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- ตั้งเป็นแอปบนหน้าจอโฮมได้ (PWA) -->
-<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e40af">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="อนุมัติวันลา">
-<link rel="apple-touch-icon" href="icon-192.png">
 <title>อนุมัติวันลา</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" onerror="showConnectRetry_('โหลด LINE SDK ไม่สำเร็จ (เช็คสัญญาณอินเทอร์เน็ต)')"></script>
 <style>
@@ -150,15 +144,9 @@ function initApp(){
   setTimeout(()=>{ if(!settled) showConnectRetry_('เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่'); }, 8000);
   liff.init({ liffId: LIFF_ID }).then(()=>{
     settled = true;
-    if(!liff.isLoggedIn()){
-      // เปิดนอกแอป LINE แล้วยังไม่ได้ล็อกอิน — พาไปเปิดในแอป LINE แทน จะได้ไม่ต้องกรอกอีเมล/รหัสผ่าน
-      if(!liff.isInClient() && !new URLSearchParams(location.search).get('web')){
-        location.href = 'https://liff.line.me/' + LIFF_ID;
-        return Promise.reject('__redirecting__');
-      }
-      liff.login();
-      return Promise.reject('__redirecting__');
-    }
+    // หมายเหตุ: ห้ามเด้งไป liff.line.me เองตรงนี้ เพราะ LINE จะเด้งกลับมาที่หน้านี้อีก
+    // กลายเป็นวนไม่รู้จบจนหน้ากะพริบ — ให้ liff.login() จัดการอย่างเดียว
+    if(!liff.isLoggedIn()){ liff.login(); return Promise.reject('__redirecting__'); }
     return liff.getProfile();
   }).then(profile=>{
     settled = true;

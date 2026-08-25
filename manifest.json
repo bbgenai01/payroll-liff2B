@@ -2,7 +2,7 @@
   "name": "อนุมัติวันลา — 2B TO HOME PLUS",
   "short_name": "อนุมัติวันลา",
   "description": "อนุมัติคำขอลาของพนักงานจากมือถือ",
-  "start_url": "admin.html",
+  "start_url": "app.html",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",

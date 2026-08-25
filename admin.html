@@ -150,7 +150,15 @@ function initApp(){
   setTimeout(()=>{ if(!settled) showConnectRetry_('เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่'); }, 8000);
   liff.init({ liffId: LIFF_ID }).then(()=>{
     settled = true;
-    if(!liff.isLoggedIn()){ liff.login(); return Promise.reject('__redirecting__'); }
+    if(!liff.isLoggedIn()){
+      // เปิดนอกแอป LINE แล้วยังไม่ได้ล็อกอิน — พาไปเปิดในแอป LINE แทน จะได้ไม่ต้องกรอกอีเมล/รหัสผ่าน
+      if(!liff.isInClient() && !new URLSearchParams(location.search).get('web')){
+        location.href = 'https://liff.line.me/' + LIFF_ID;
+        return Promise.reject('__redirecting__');
+      }
+      liff.login();
+      return Promise.reject('__redirecting__');
+    }
     return liff.getProfile();
   }).then(profile=>{
     settled = true;

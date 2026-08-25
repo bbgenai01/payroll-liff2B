@@ -1,0 +1,50 @@
+<!--
+  ทางลัดสำหรับไอคอนบนหน้าจอโฮม (PWA)
+  หน้านี้ไม่แสดงอะไร แค่พาเข้าแอป LINE เพื่อเปิดหน้าอนุมัติวันลา
+  เหตุผล: ถ้าเปิดหน้าอนุมัติในเบราว์เซอร์ตรงๆ จะต้องล็อกอิน LINE ด้วยอีเมล/รหัสผ่านทุกครั้ง
+          แต่ถ้าเปิดผ่านแอป LINE จะรู้ว่าเป็นใครอยู่แล้ว ไม่ต้องล็อกอินเลย
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e40af">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="อนุมัติวันลา">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>อนุมัติวันลา</title>
+<style>
+  body{ font-family:'Sarabun','Tahoma',sans-serif; margin:0; min-height:100vh;
+    background:linear-gradient(135deg,#1e40af,#1e3a8a); color:#fff;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  p{ font-size:14px; opacity:.9; margin:0 0 22px; line-height:1.7; }
+  a.btn{ display:block; width:100%; max-width:280px; padding:14px; border-radius:10px;
+    background:#fff; color:#1e40af; font-size:16px; font-weight:700; text-decoration:none; margin-bottom:10px; }
+  a.alt{ background:rgba(255,255,255,.15); color:#fff; font-weight:600; font-size:14px; }
+  .dots{ font-size:13px; opacity:.75; margin-top:4px; }
+</style>
+</head>
+<body>
+  <h1>✅ อนุมัติวันลา</h1>
+  <p id="msg">กำลังเปิดในแอป LINE...<br><span class="dots">ไม่ต้องล็อกอินซ้ำ</span></p>
+  <a class="btn" id="openLine" href="https://liff.line.me/2010792715-pdxCqzZS">เปิดในแอป LINE</a>
+  <a class="btn alt" href="admin.html">เปิดในเบราว์เซอร์แทน (ต้องล็อกอิน)</a>
+
+<script>
+// เด้งเข้าแอป LINE อัตโนมัติ — ถ้าเบราว์เซอร์บล็อกการเด้งเอง ผู้ใช้ยังกดปุ่มเองได้
+var LIFF_URL = 'https://liff.line.me/2010792715-pdxCqzZS';
+setTimeout(function(){
+  try{ location.href = LIFF_URL; }
+  catch(e){ document.getElementById('msg').textContent = 'กดปุ่มด้านล่างเพื่อเปิดในแอป LINE'; }
+}, 400);
+// ถ้าผ่านไป 3 วินาทีแล้วยังอยู่หน้านี้ แปลว่าเปิดแอปไม่สำเร็จ ให้บอกผู้ใช้กดเอง
+setTimeout(function(){
+  document.getElementById('msg').innerHTML = 'ถ้าไม่เด้งเข้าแอป LINE เอง<br><span class="dots">กดปุ่มด้านล่างได้เลย</span>';
+}, 3000);
+</script>
+</body>
+</html>

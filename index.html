@@ -477,7 +477,11 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
       <tr><td>OT วันทำงาน (${d.otHours||0} ชม.)</td><td>${moneyTH_(d.otPay)}</td></tr>
       <tr><td>ทำงานวันหยุด (${d.holidayHours||0} ชม.)</td><td>${moneyTH_(d.holidayWorkPay)}</td></tr>
       <tr><td>OT วันหยุด (${d.otHolidayHours||0} ชม.)</td><td>${moneyTH_(d.otHolidayPay)}</td></tr>
-      <tr><td>เบี้ยขยัน${d.bonusType==='percent'? ' ('+d.bonusPercent+'%)':''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
+      <tr><td>เบี้ยขยัน${d.bonusType==='percent'
+            ? (d.latePenalty>0
+                ? ' ('+d.bonusPercentBase+'% − '+d.latePenalty+'% มาสาย = '+d.bonusPercent+'%)'
+                : ' ('+d.bonusPercent+'%)')
+            : ''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
       ${d.bonusAnnual>0 ? '<tr><td>โบนัสประจำปี</td><td>'+moneyTH_(d.bonusAnnual)+'</td></tr>' : ''}
       <tr><td>ค่าน้ำมัน</td><td>${moneyTH_(d.oil)}</td></tr>
       <tr><td>ค่าไลฟ์ (${d.liveHours||0} ชม.)</td><td>${moneyTH_(d.livePay)}</td></tr>
@@ -496,6 +500,13 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
       <tr><td>ลากิจ</td><td>${d.leavePersonal||0} วัน (คงเหลือ ${lr.personal!==undefined? lr.personal.toFixed(1):'-'} วัน)</td></tr>
       <tr><td>ลาพักร้อน</td><td>${d.leaveAnnual||0} วัน (คงเหลือ ${lr.annual!==undefined? lr.annual.toFixed(1):'-'} วัน)</td></tr>
     </table>
+    ${d.lateCount!==undefined ? `
+    <div class="slip-section-title">การมาทำงาน</div>
+    <table class="slip-table">
+      <tr><td>วันทำงาน</td><td>${d.daysWorked||0} วัน</td></tr>
+      <tr><td>มาสายเกิน ${d.lateGraceMin!==undefined? d.lateGraceMin : 10} นาที (เข้างาน ${d.workStartTime||'09:00'})</td><td>${d.lateCount||0} ครั้ง</td></tr>
+    </table>` : ''}
+    ${d.slipNote ? '<div class="slip-section-title">หมายเหตุ</div><p style="white-space:pre-wrap; font-size:13px; margin:4px 0 10px;">'+escapeHtml_(d.slipNote)+'</p>' : ''}
     <p class="hint" style="margin-top:12px;">เอกสารนี้เป็นการคำนวณเบื้องต้นจากข้อมูลที่บันทึกในระบบ โปรดตรวจสอบความถูกต้องก่อนใช้เป็นเอกสารทางการ</p>
   `;
 }

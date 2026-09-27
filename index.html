@@ -503,7 +503,9 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
     ${d.lateCount!==undefined ? `
     <div class="slip-section-title">การมาทำงาน</div>
     <table class="slip-table">
-      <tr><td>วันทำงาน</td><td>${d.daysWorked||0} วัน</td></tr>
+      <tr><td>วันทำงานปกติ</td><td>${d.daysWorked||0} วัน</td></tr>
+      <tr><td>ทำงานวันหยุด</td><td>${d.daysHolidayWork||0} วัน</td></tr>
+      <tr><td><b>รวมวันที่มาทำงาน</b></td><td><b>${d.daysPresent!==undefined? d.daysPresent : (d.daysWorked||0)} วัน</b></td></tr>
       <tr><td>มาสายเกิน ${d.lateGraceMin!==undefined? d.lateGraceMin : 10} นาที (เข้างาน ${d.workStartTime||'09:00'})</td><td>${d.lateCount||0} ครั้ง</td></tr>
     </table>` : ''}
     ${d.slipNote ? '<div class="slip-section-title">หมายเหตุ</div><p style="white-space:pre-wrap; font-size:13px; margin:4px 0 10px;">'+escapeHtml_(d.slipNote)+'</p>' : ''}

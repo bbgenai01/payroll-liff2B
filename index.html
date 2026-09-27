@@ -477,7 +477,7 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
       <tr><td>OT วันทำงาน (${d.otHours||0} ชม.)</td><td>${moneyTH_(d.otPay)}</td></tr>
       <tr><td>ทำงานวันหยุด (${d.holidayHours||0} ชม.)</td><td>${moneyTH_(d.holidayWorkPay)}</td></tr>
       <tr><td>OT วันหยุด (${d.otHolidayHours||0} ชม.)</td><td>${moneyTH_(d.otHolidayPay)}</td></tr>
-      <tr><td>โบนัส${d.bonusType==='percent'? ' ('+d.bonusPercent+'%)':''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
+      <tr><td>เบี้ยขยัน${d.bonusType==='percent'? ' ('+d.bonusPercent+'%)':''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
       ${d.bonusAnnual>0 ? '<tr><td>โบนัสประจำปี</td><td>'+moneyTH_(d.bonusAnnual)+'</td></tr>' : ''}
       <tr><td>ค่าน้ำมัน</td><td>${moneyTH_(d.oil)}</td></tr>
       <tr><td>ค่าไลฟ์ (${d.liveHours||0} ชม.)</td><td>${moneyTH_(d.livePay)}</td></tr>

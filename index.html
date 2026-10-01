@@ -59,6 +59,14 @@
   #confirmOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300;
     align-items:center; justify-content:center; padding:20px; }
   #confirmOverlay.show{ display:flex; }
+  #noticeOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:310;
+    align-items:center; justify-content:center; padding:24px; }
+  #noticeOverlay.show{ display:flex; }
+  #noticeCard{ background:#fff; border-radius:14px; padding:20px; max-width:340px; width:100%; }
+  #noticeCard h3{ margin:0 0 12px; font-size:17px; text-align:center; color:var(--primary-dark); }
+  #noticeBody{ font-size:14px; line-height:1.75; color:#374151; }
+  #btnNoticeOk{ width:100%; margin-top:16px; padding:12px; border:none; border-radius:9px;
+    font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; background:var(--primary); color:#fff; }
   #confirmCard{ background:#fff; border-radius:14px; padding:20px; max-width:340px; width:100%; }
   #confirmCard h3{ margin:0 0 12px; font-size:17px; text-align:center; color:var(--primary-dark); }
   #confirmBody{ font-size:14px; line-height:1.7; margin-bottom:8px; }
@@ -177,6 +185,14 @@
       <button id="btnConfirmNo" onclick="closeConfirm_(false)">ยกเลิก</button>
       <button id="btnConfirmYes" onclick="closeConfirm_(true)">ยืนยันส่ง</button>
     </div>
+  </div>
+</div>
+
+<div id="noticeOverlay">
+  <div id="noticeCard">
+    <h3 id="noticeTitle">โควตาวันลาไม่พอ</h3>
+    <div id="noticeBody"></div>
+    <button id="btnNoticeOk" onclick="closeNotice_()">เข้าใจแล้ว</button>
   </div>
 </div>
 
@@ -338,6 +354,24 @@ async function submitLeave(e){
   const fileInput = document.getElementById('lfEvidence');
   const file = fileInput.files[0];
 
+  // กันกดลาเกินสิทธิ์ — บอกไปเลยว่าเหลือเท่าไหร่ และให้เลือกประเภทไหนแทนได้บ้าง
+  const avail = availableDays_(leaveType);
+  if(avail !== null && leaveDays > avail + 1e-9){
+    const label = LEAVE_TYPE_LABEL[leaveType] || leaveType;
+    const alts = [];
+    ['personal','annual'].forEach(t=>{
+      if(t === leaveType) return;
+      const a = availableDays_(t);
+      if(a !== null && a > 0) alts.push(`<b>${LEAVE_TYPE_LABEL[t]}</b> (เหลือ ${a} วัน)`);
+    });
+    alts.push('<b>ลาไม่รับค่าจ้าง</b> (ไม่จำกัด แต่จะถูกหักเงินตามจำนวนวันที่ลา)');
+    showNotice_('โควตา' + label + 'ไม่พอ',
+      `${label}ของคุณเหลือ <b>${avail > 0 ? avail : 0} วัน</b> แต่ขอลา <b>${leaveDays} วัน</b><br><br>`
+      + 'กรุณาเปลี่ยนไปใช้ประเภทอื่นแทน:<br>• ' + alts.join('<br>• ')
+      + '<br><br><span style="color:#6b7280; font-size:13px;">หากมีเหตุจำเป็น ติดต่อแอดมินเพื่อพิจารณาเป็นรายกรณี</span>');
+    return;
+  }
+
   // ยืนยันก่อนส่ง — สรุปให้อ่านอีกรอบ กันกดผิดวันหรือผิดประเภท
   const rows = [
     ['ประเภท', LEAVE_TYPE_LABEL[leaveType]||leaveType],
@@ -374,10 +408,26 @@ async function submitLeave(e){
     send(null);
   }
 }
+let _balance = null;
+function closeNotice_(){ document.getElementById('noticeOverlay').classList.remove('show'); }
+function showNotice_(title, html){
+  document.getElementById('noticeTitle').textContent = title;
+  document.getElementById('noticeBody').innerHTML = html;
+  document.getElementById('noticeOverlay').classList.add('show');
+}
+function availableDays_(type){
+  // สิทธิ์ที่ขอได้จริง = คงเหลือ − ที่ยื่นไว้แล้วแต่ยังรออนุมัติ
+  if(!_balance || !_balance[type]) return null;
+  const b = _balance[type];
+  const remain = Number(b.remaining);
+  if(isNaN(remain)) return null;
+  return remain - (Number(b.pending)||0);
+}
 function loadBalance(){
   const year = String(new Date().getFullYear());
   apiGet('getLeaveBalance', { empId: EMP_ID, year }).then(r=>{
     if(r.error) return;
+    _balance = r;
     document.getElementById('balanceRow').innerHTML = `
       <div class="kpi"><div class="num">${r.sick.remaining}</div><div class="lbl">ลาป่วยคงเหลือ</div></div>
       <div class="kpi"><div class="num">${r.personal.remaining}</div><div class="lbl">ลากิจคงเหลือ</div></div>
@@ -492,6 +542,9 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
       <tr><td>ลาไม่รับค่าจ้าง (${d.leaveUnpaidDays||0} วัน)</td><td>-${moneyTH_(d.unpaidDeduction)}</td></tr>
       <tr><td>ประกันสังคม${d.noSS? ' (ยกเว้น)' : (d.ssBaseAmount!==undefined? ' ('+d.ssRate+'% ของ '+moneyTH_(d.ssBaseAmount)+')' : '')}</td><td>-${moneyTH_(d.ssDeduction)}</td></tr>
       ${d.whtEnabled ? '<tr><td>หัก ณ ที่จ่าย'+(d.wht3? ' (3%)':'')+'</td><td>-'+moneyTH_(d.whtDeduction)+'</td></tr>' : ''}
+      ${(d.advanceList||[]).map(a=>
+        '<tr><td>เบิกเงินล่วงหน้า ('+thaiDateFull_(a.date)+(a.note? ' — '+escapeHtml_(a.note) : '')+')</td><td>-'+moneyTH_(a.amount)+'</td></tr>'
+      ).join('')}
       <tr class="slip-total-row"><td>เงินเดือนสุทธิ</td><td>${moneyTH_(netPay)} บาท</td></tr>
     </table>
     <div class="slip-section-title">สรุปวันลา (เดือนนี้ / คงเหลือทั้งปี)</div>

@@ -118,7 +118,9 @@ function escapeHtml_(s){
 function showConnectRetry_(msg){
   const box = document.getElementById('connectRetryBox');
   if(!box) return;
-  document.getElementById('connectRetryMsg').textContent = msg || 'เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ';
+  const el = document.getElementById('connectRetryMsg');
+  el.style.whiteSpace = 'pre-wrap';
+  el.textContent = msg || 'เชื่อมต่อ LINE ไม่สำเร็จ หรือใช้เวลานานผิดปกติ';
   box.style.display = 'block';
 }
 async function apiGet(action, params){
@@ -141,7 +143,16 @@ function initApp(){
     return;
   }
   let settled = false;
-  setTimeout(()=>{ if(!settled) showConnectRetry_('เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่'); }, 8000);
+  setTimeout(()=>{
+    if(settled) return;
+    // บอกสาเหตุให้ชัด แทนที่จะบอกแค่ว่า "นานเกินไป" ซึ่งไม่รู้ว่าต้องแก้ตรงไหน
+    const inClient = (()=>{ try{ return liff.isInClient(); }catch(e){ return false; } })();
+    showConnectRetry_(inClient
+      ? 'เชื่อมต่อ LINE ใช้เวลานานผิดปกติ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่'
+      : 'หน้านี้ถูกเปิดเป็นเว็บธรรมดา ไม่ใช่โหมด LIFF — แปลว่า Endpoint URL ที่ตั้งไว้ใน LINE Developers '
+        + 'ไม่ตรงกับที่อยู่ที่เปิดจริง\n\nที่อยู่ที่เปิดอยู่ตอนนี้:\n' + location.origin + location.pathname
+        + '\n\nให้นำที่อยู่บรรทัดบนไปใส่ในช่อง Endpoint URL ของ LIFF แล้วเปิดใหม่');
+  }, 8000);
   liff.init({ liffId: LIFF_ID }).then(()=>{
     settled = true;
     // หมายเหตุ: ห้ามเด้งไป liff.line.me เองตรงนี้ เพราะ LINE จะเด้งกลับมาที่หน้านี้อีก
@@ -155,7 +166,8 @@ function initApp(){
   }).catch(err=>{
     settled = true;
     if(err==='__redirecting__') return;
-    showConnectRetry_('เชื่อมต่อ LINE ไม่สำเร็จ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่');
+    const detail = (err && (err.message || err.code)) ? ' (' + (err.code||'') + ' ' + (err.message||'') + ')' : '';
+    showConnectRetry_('เชื่อมต่อ LINE ไม่สำเร็จ ลองกดปุ่มด้านล่างเพื่อโหลดใหม่' + detail);
   });
 }
 function checkLink(){

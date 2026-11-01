@@ -111,7 +111,11 @@
     <div class="card">
       <h2>🙋 กดลา</h2>
       <form id="leaveForm" onsubmit="submitLeave(event)">
-        <div class="field"><label>วันที่ *</label><input type="date" id="lfDate" required></div>
+        <div class="field"><label>วันที่เริ่มลา *</label><input type="date" id="lfDate" required onchange="onLeaveRangeChange()"></div>
+        <div class="field">
+          <label>ลาถึงวันที่ (เว้นว่างถ้าลาวันเดียว)</label>
+          <input type="date" id="lfDateTo" onchange="onLeaveRangeChange()">
+        </div>
         <div class="field">
           <label>ประเภทการลา</label>
           <select id="lfType" onchange="toggleEvidence()">
@@ -121,10 +125,11 @@
             <option value="unpaid">ลาไม่รับค่าจ้าง</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" id="lfDaysField">
           <label>จำนวนวัน</label>
           <select id="lfDays"><option value="1">เต็มวัน (1)</option><option value="0.5">ครึ่งวัน (0.5)</option></select>
         </div>
+        <p id="lfRangeInfo" style="display:none; font-size:13.5px; color:var(--primary-dark); background:#fff7ed; border-radius:8px; padding:10px; margin:0 0 10px;"></p>
         <div class="field"><label>เหตุผล</label><input type="text" id="lfReason" placeholder="ระบุสั้นๆ"></div>
         <div class="field" id="evidenceField" style="display:none;">
           <label>แนบรูปใบรับรองแพทย์ (ถ้ามี โดยเฉพาะลาป่วย 3 วันขึ้นไป)</label>
@@ -345,11 +350,50 @@ function closeConfirm_(ok){
   document.getElementById('confirmOverlay').classList.remove('show');
   if(_confirmResolve){ _confirmResolve(ok); _confirmResolve = null; }
 }
+// นับจำนวนวันลาในช่วง โดยไม่นับวันอาทิตย์ (วันหยุดประจำสัปดาห์)
+function countLeaveDays_(from, to){
+  if(!from) return { days:0, list:[] };
+  if(!to || to < from) return { days:1, list:[from] };
+  const list = [];
+  const d = new Date(from + 'T00:00:00');
+  const end = new Date(to + 'T00:00:00');
+  let guard = 0;
+  while(d <= end && guard++ < 400){
+    if(d.getDay() !== 0){   // 0 = อาทิตย์
+      list.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return { days:list.length, list };
+}
+function onLeaveRangeChange(){
+  const from = document.getElementById('lfDate').value;
+  const to   = document.getElementById('lfDateTo').value;
+  const info = document.getElementById('lfRangeInfo');
+  const daysField = document.getElementById('lfDaysField');
+  if(!from || !to || to <= from){
+    info.style.display = 'none';
+    daysField.style.display = '';
+    return;
+  }
+  const r = countLeaveDays_(from, to);
+  daysField.style.display = 'none';   // ลาหลายวันคิดเป็นเต็มวันเสมอ
+  info.style.display = 'block';
+  info.innerHTML = r.days
+    ? `ลาต่อเนื่อง <b>${r.days} วัน</b> (${thaiDateFull_(from)} ถึง ${thaiDateFull_(to)})<br>`
+      + '<span style="color:#6b7280;">ไม่นับวันอาทิตย์ · ถ้ามีวันหยุดนักขัตฤกษ์คร่อมอยู่ แอดมินจะปรับให้ตอนอนุมัติ</span>'
+    : 'ช่วงที่เลือกมีแต่วันอาทิตย์ ไม่มีวันที่ต้องลา';
+}
 async function submitLeave(e){
   e.preventDefault();
   const date = document.getElementById('lfDate').value;
+  const dateToRaw = document.getElementById('lfDateTo').value;
+  const isRange = !!(dateToRaw && dateToRaw > date);
+  const range = countLeaveDays_(date, isRange ? dateToRaw : '');
   const leaveType = document.getElementById('lfType').value;
-  const leaveDays = parseFloat(document.getElementById('lfDays').value);
+  const leaveDays = isRange ? range.days : parseFloat(document.getElementById('lfDays').value);
+  const dateTo = isRange ? dateToRaw : '';
+  if(isRange && !range.days){ toast('ช่วงที่เลือกมีแต่วันอาทิตย์ ไม่มีวันที่ต้องลา'); return; }
   const reason = document.getElementById('lfReason').value.trim();
   const fileInput = document.getElementById('lfEvidence');
   const file = fileInput.files[0];
@@ -375,7 +419,7 @@ async function submitLeave(e){
   // ยืนยันก่อนส่ง — สรุปให้อ่านอีกรอบ กันกดผิดวันหรือผิดประเภท
   const rows = [
     ['ประเภท', LEAVE_TYPE_LABEL[leaveType]||leaveType],
-    ['วันที่', thaiDateFull_(date)],
+    ['วันที่', isRange ? (thaiDateFull_(date) + ' ถึง ' + thaiDateFull_(dateTo)) : thaiDateFull_(date)],
     ['จำนวน', leaveDays + ' วัน']
   ];
   if(reason) rows.push(['เหตุผล', reason]);
@@ -384,13 +428,14 @@ async function submitLeave(e){
 
   const send = (evidenceBase64)=>{
     apiPost('submitLeave', {
-      empId: EMP_ID, empName: EMP_NAME, date, leaveType, leaveDays, reason,
+      empId: EMP_ID, empName: EMP_NAME, date, dateTo, leaveType, leaveDays, reason,
       evidenceBase64: evidenceBase64||'', evidenceFileName: file? file.name : '', source:'line'
     }).then(r=>{
       if(r.error){ toast(r.error); return; }
       toast('✅ ส่งคำขอลาแล้ว กำลังกลับไปหน้าแชท...');
       document.getElementById('leaveForm').reset();
       document.getElementById('lfDate').value = todayISO();
+      onLeaveRangeChange();
       toggleEvidence();
       loadBalance();
       // ปิดหน้านี้เองแล้วพากลับเข้าแชท — พนักงานจะเห็นข้อความยืนยันทันที
@@ -527,11 +572,13 @@ function renderSlipDetailHtml_(month, d, netPayFallback){
       <tr><td>OT วันทำงาน (${d.otHours||0} ชม.)</td><td>${moneyTH_(d.otPay)}</td></tr>
       <tr><td>ทำงานวันหยุด (${d.holidayHours||0} ชม.)</td><td>${moneyTH_(d.holidayWorkPay)}</td></tr>
       <tr><td>OT วันหยุด (${d.otHolidayHours||0} ชม.)</td><td>${moneyTH_(d.otHolidayPay)}</td></tr>
-      <tr><td>เบี้ยขยัน${d.bonusType==='percent'
-            ? (d.latePenalty>0
-                ? ' ('+d.bonusPercentBase+'% − '+d.latePenalty+'% มาสาย = '+d.bonusPercent+'%)'
-                : ' ('+d.bonusPercent+'%)')
-            : ''}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
+      <tr><td>เบี้ยขยัน${d.bonusVoidReason
+            ? ' — ไม่ได้รับ ('+escapeHtml_(d.bonusVoidReason)+')'
+            : (d.bonusType==='percent'
+                ? (d.latePenalty>0
+                    ? ' ('+d.bonusPercentBase+'% − '+d.latePenalty+'% มาสาย = '+d.bonusPercent+'%)'
+                    : ' ('+d.bonusPercent+'%)')
+                : '')}</td><td>${moneyTH_(d.bonusRegular)}</td></tr>
       ${d.bonusAnnual>0 ? '<tr><td>โบนัสประจำปี</td><td>'+moneyTH_(d.bonusAnnual)+'</td></tr>' : ''}
       <tr><td>ค่าน้ำมัน</td><td>${moneyTH_(d.oil)}</td></tr>
       <tr><td>ค่าไลฟ์ (${d.liveHours||0} ชม.)</td><td>${moneyTH_(d.livePay)}</td></tr>
